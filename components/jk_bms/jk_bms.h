@@ -237,7 +237,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   void set_enable_fake_traffic(bool enable_fake_traffic) { enable_fake_traffic_ = enable_fake_traffic; }
 
-  bool get_uart_processing_active() {return uart_processing_active_}
+  bool get_uart_processing_active() {return uart_processing_active_; }
 
   void dump_config() override;
 
