@@ -71,7 +71,7 @@ substitutions:
 esphome:
   name: ${name}
   includes:
-    - jk-bms-helper.h
+    - JkBmsHelper.h
   on_boot:
     then:
       - switch.turn_on: inverter_charging
@@ -158,7 +158,7 @@ jk_modbus:
 jk_bms:
   id: bms0
   jk_modbus_id: modbus0
-#  enable_fake_traffic: true
+  enable_fake_traffic: true # disable
 
 canbus:
   - platform: esp32_can
@@ -282,7 +282,7 @@ interval:
             // # cell_voltage_undervoltage
             limitChargeCurrent(id(min_cell_voltage).state,
                                id(cell_voltage_undervoltage_recovery).state,
-                               id(cell_voltage_overvoltage_protection).state,
+                               id(cell_voltage_undervoltage_protection).state,
                                0.1f,
                                "cell_voltage_undervoltage");
 
@@ -387,7 +387,7 @@ interval:
             can_mesg[7] = uint16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) >> 8 & 0xff;
             id(charging_status).publish_state(id(charge_status));
 
-            ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(cell_min_dischange_voltage).state * id(cells).state));
+            ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) / 10.0f);
 
             ESP_LOGI("main", "send can id: 0x351 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
             ESP_LOGI("main", "send can id: Charge Status %s", id(charge_status).c_str());

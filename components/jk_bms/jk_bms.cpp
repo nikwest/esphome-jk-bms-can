@@ -429,21 +429,27 @@ void JkBms::publish_state_(binary_sensor::BinarySensor *binary_sensor, const boo
   if (binary_sensor == nullptr)
     return;
 
-  binary_sensor->publish_state(state);
+  if(binary_sensor->state != state) {
+    binary_sensor->publish_state(state);  
+  }
 }
 
 void JkBms::publish_state_(sensor::Sensor *sensor, float value) {
   if (sensor == nullptr)
     return;
 
-  sensor->publish_state(value);
+  if(sensor->state != value) {
+    sensor->publish_state(value);
+  }
 }
 
 void JkBms::publish_state_(text_sensor::TextSensor *text_sensor, const std::string &state) {
   if (text_sensor == nullptr)
     return;
 
-  text_sensor->publish_state(state);
+  if(text_sensor->state.compare(state) != 0) {
+    text_sensor->publish_state(state);
+  }
 }
 
 std::string JkBms::error_bits_to_string_(const uint16_t mask) {
