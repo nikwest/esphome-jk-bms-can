@@ -68,8 +68,9 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   ESP_LOGI(TAG, "Status frame received");
   
   // wait until sending of can messages is finished
-  while (this->uart_or_send_can_active_) {
-    ESP_LOGI(TAG, "uart waits for can to finish updating");
+  if (this->get_uart_or_send_can_active()) {
+    ESP_LOGI(TAG, "wait for can to finish");
+    return;
   }
   this->uart_or_send_can_active_ = true;
 
