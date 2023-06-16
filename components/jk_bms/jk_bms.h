@@ -237,9 +237,9 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   void set_enable_fake_traffic(bool enable_fake_traffic) { enable_fake_traffic_ = enable_fake_traffic; }
   
-  void set_uart_or_send_can_active(bool uart_or_send_can_active) { uart_or_send_can_active_ = uart_or_send_can_active; }
+  void set_states_updated(bool states_updated) { states_updated_ = states_updated; }
   
-  bool get_uart_or_send_can_active() {return uart_or_send_can_active_; }
+  bool get_states_updated() {return states_updated_; }
 
   void dump_config() override;
 
@@ -333,7 +333,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   } cells_[24];
 
   bool enable_fake_traffic_;
-  bool uart_or_send_can_active_ = false;
+  bool states_updated_ = false;
 
   void on_status_data_(const std::vector<uint8_t> &data);
   void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
