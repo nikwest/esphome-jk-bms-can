@@ -71,7 +71,7 @@ substitutions:
 esphome:
   name: ${name}
   includes:
-    - JkBmsHelper.h
+    - jk-bms-helper.h
   on_boot:
     then:
       - switch.turn_on: inverter_charging
@@ -386,6 +386,9 @@ interval:
             can_mesg[6] = uint16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) & 0xff;
             can_mesg[7] = uint16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) >> 8 & 0xff;
             id(charging_status).publish_state(id(charge_status));
+
+            ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(cell_min_dischange_voltage).state * id(cells).state));
+
             ESP_LOGI("main", "send can id: 0x351 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
             ESP_LOGI("main", "send can id: Charge Status %s", id(charge_status).c_str());
             return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
