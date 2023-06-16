@@ -72,6 +72,7 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
     ESP_LOGI(TAG, "wait for can to finish");
     //return;
   }
+  ESP_LOGI(TAG, "uart activate set_uart_or_send_can_active(true)");
   set_uart_or_send_can_active(true);
 
   // Status request
@@ -385,6 +386,7 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
 
   // 00 00 00 00 68 00 00 54 D1: End of frame
   
+  ESP_LOGI(TAG, "uart activate set_uart_or_send_can_active(false)");
   set_uart_or_send_can_active(false);
   
   if(publish_all_states_counter++ >= RESET_PUBLISH_ALL_STATES_COUNTER_EVERY) {
