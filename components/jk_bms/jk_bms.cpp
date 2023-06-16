@@ -70,7 +70,7 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   // wait until sending of can messages is finished
   if (get_uart_or_send_can_active()) {
     ESP_LOGI(TAG, "wait for can to finish");
-    return;
+    //return;
   }
   set_uart_or_send_can_active(true);
 
