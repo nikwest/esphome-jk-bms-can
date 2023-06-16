@@ -333,7 +333,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   } cells_[24];
 
   bool enable_fake_traffic_;
-  bool uart_or_send_can_active_;
+  volatile bool uart_or_send_can_active_;
 
   void on_status_data_(const std::vector<uint8_t> &data);
   void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
