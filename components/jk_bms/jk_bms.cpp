@@ -69,7 +69,7 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   
   // wait until sending of can messages is finished
   while (this->uart_or_send_can_active_) {
-    delay(1);
+    ESP_LOGI(TAG, "uart waits for can to finish updating");
   }
   this->uart_or_send_can_active_ = true;
 
