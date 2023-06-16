@@ -60,6 +60,8 @@ void JkBms::on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t
 }
 
 void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
+  this->uart_processing_active_ = true;
+  
   auto jk_get_16bit = [&](size_t i) -> uint16_t { return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0); };
   auto jk_get_32bit = [&](size_t i) -> uint32_t {
     return (uint32_t(jk_get_16bit(i + 0)) << 16) | (uint32_t(jk_get_16bit(i + 2)) << 0);
@@ -378,6 +380,7 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
 
   // 00 00 00 00 68 00 00 54 D1: End of frame
   
+  this->uart_processing_active_ = false;
   
   if(publish_all_states_counter++ >= RESET_PUBLISH_ALL_STATES_COUNTER_EVERY) {
     publish_all_states_counter = 0;

@@ -32,7 +32,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   void set_dedicated_charger_switch_binary_sensor(binary_sensor::BinarySensor *dedicated_charger_switch_binary_sensor) {
     dedicated_charger_switch_binary_sensor_ = dedicated_charger_switch_binary_sensor;
   }
-
+  
   void set_min_cell_voltage_sensor(sensor::Sensor *min_cell_voltage_sensor) {
     min_cell_voltage_sensor_ = min_cell_voltage_sensor;
   }
@@ -236,6 +236,8 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   }
 
   void set_enable_fake_traffic(bool enable_fake_traffic) { enable_fake_traffic_ = enable_fake_traffic; }
+  
+  bool () {return uart_processing_active_}
 
   void dump_config() override;
 
@@ -329,6 +331,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   } cells_[24];
 
   bool enable_fake_traffic_;
+  bool uart_processing_active_;
 
   void on_status_data_(const std::vector<uint8_t> &data);
   void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
