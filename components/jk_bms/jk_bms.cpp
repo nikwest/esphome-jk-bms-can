@@ -46,6 +46,10 @@ static const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
 
 bool sendOtherFake = false;
 
+static const uint8_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 30; 
+
+uint8_t publish_all_states_counter = 0;
+
 void JkBms::on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t> &data) {
   if (function == FUNCTION_READ_ALL) {
     this->on_status_data_(data);
@@ -373,6 +377,11 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   this->publish_state_(this->protocol_version_sensor_, (float) data[offset + 84 + 3 * 45]);
 
   // 00 00 00 00 68 00 00 54 D1: End of frame
+  
+  
+  if(publish_all_states_counter++ >= RESET_PUBLISH_ALL_STATES_COUNTER_EVERY) {
+    publish_all_states_counter = 0;
+  }
 }
 
 void JkBms::update() {
@@ -456,7 +465,7 @@ void JkBms::publish_state_(binary_sensor::BinarySensor *binary_sensor, const boo
   if (binary_sensor == nullptr)
     return;
 
-  if(binary_sensor->state != state) {
+  if(binary_sensor->state != state || publish_all_states_counter == 0) {
     binary_sensor->publish_state(state);  
   }
 }
@@ -465,7 +474,7 @@ void JkBms::publish_state_(sensor::Sensor *sensor, float value) {
   if (sensor == nullptr)
     return;
 
-  if(sensor->state != value) {
+  if(sensor->state != value || publish_all_states_counter == 0) {
     sensor->publish_state(value);
   }
 }
@@ -474,7 +483,7 @@ void JkBms::publish_state_(text_sensor::TextSensor *text_sensor, const std::stri
   if (text_sensor == nullptr)
     return;
 
-  if(text_sensor->state.compare(state) != 0) {
+  if(text_sensor->state.compare(state) != 0 || publish_all_states_counter == 0) {
     text_sensor->publish_state(state);
   }
 }
