@@ -28,6 +28,7 @@ DEPENDENCIES = ["jk_bms"]
 
 CODEOWNERS = ["@syssi"]
 
+CONF_CELLS = "cells"
 CONF_MIN_CELL_VOLTAGE = "min_cell_voltage"
 CONF_MAX_CELL_VOLTAGE = "max_cell_voltage"
 CONF_MIN_VOLTAGE_CELL = "min_voltage_cell"
@@ -178,6 +179,7 @@ CELLS = [
 ]
 
 SENSORS = [
+    CONF_CELLS,
     CONF_MIN_CELL_VOLTAGE,
     CONF_MAX_CELL_VOLTAGE,
     CONF_MIN_VOLTAGE_CELL,
@@ -282,6 +284,13 @@ CONFIG_SCHEMA = cv.Schema(
             icon=ICON_EMPTY,
             accuracy_decimals=3,
             device_class=DEVICE_CLASS_VOLTAGE,
+            state_class=STATE_CLASS_MEASUREMENT,
+        ),
+        cv.Optional(CONF_CELLS): sensor.sensor_schema(
+            unit_of_measurement=UNIT_EMPTY,
+            icon=ICON_EMPTY,
+            accuracy_decimals=0,
+            device_class=DEVICE_CLASS_EMPTY,
             state_class=STATE_CLASS_MEASUREMENT,
         ),
         cv.Optional(CONF_CELL_VOLTAGE_1): sensor.sensor_schema(

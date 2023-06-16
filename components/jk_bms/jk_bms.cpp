@@ -90,6 +90,8 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   // 0x10 0x0E 0xF4: Cell 16        3828 * 0.001 = 3.828V                        0.001 V
     
   uint8_t cells = data[1] / 3;
+  
+  this->publish_state_(this->cells_sensor_, cells);
 
   float min_cell_voltage = 100.0f;
   float max_cell_voltage = -100.0f;
@@ -494,6 +496,7 @@ void JkBms::dump_config() {  // NOLINT(google-readability-function-size,readabil
   LOG_SENSOR("", "Maximum Voltage Cell", this->max_voltage_cell_sensor_);
   LOG_SENSOR("", "Delta Cell Voltage", this->delta_cell_voltage_sensor_);
   LOG_SENSOR("", "Average Cell Voltage", this->average_cell_voltage_sensor_);
+  LOG_SENSOR("", "Cells", this->cells_sensor_);
   LOG_SENSOR("", "Cell Voltage 1", this->cells_[0].cell_voltage_sensor_);
   LOG_SENSOR("", "Cell Voltage 2", this->cells_[1].cell_voltage_sensor_);
   LOG_SENSOR("", "Cell Voltage 3", this->cells_[2].cell_voltage_sensor_);
