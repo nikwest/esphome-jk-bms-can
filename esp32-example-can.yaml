@@ -98,6 +98,14 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: no_uart_update_counter
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: uart_missing_error
+    type: bool
+    restore_value: no
+    initial_value: 'true'
   - id: charge_status
     type: std::string
     restore_value: no
@@ -120,6 +128,7 @@ wifi:
 
 ota:
 logger:
+  baud_rate: 921600
 
 # Please use the native `api` component instead of the `mqtt` section
 # if you use Home Assistant. The native API is more lightweight.
@@ -180,7 +189,15 @@ interval:
       if:
         condition:
           lambda: |-
-            return id(bms0).get_states_updated();
+            if (id(bms0).get_states_updated()) {
+              id(uart_missing_error) = false;
+              id(no_uart_update_counter) = 0;
+              return true;
+            } else if (id(no_uart_update_counter) ++ >= 3000) {
+              id(uart_missing_error) = true;
+              return true;
+            }
+            return false;
         then:
           - lambda: |-
               id(bms0).set_states_updated(false);
@@ -266,15 +283,9 @@ interval:
                     id(discharging_current).publish_state(id(discharging_overcurrent_protection).state * 0.95f);
                 }
 
-                ESP_LOGI("main", "id(charging_overcurrent_protection).state * 0.95f %.3f", id(charging_overcurrent_protection).state * 0.95f);
-                ESP_LOGI("main", "id(charging_current).state %.3f", id(charging_current).state);
-
                 // # startCalculuation
                 initValues(min(id(charging_overcurrent_protection).state * 0.95f, id(charging_current).state),
                           min(id(discharging_overcurrent_protection).state * 0.95f, id(discharging_current).state));
-
-                ESP_LOGI("main", "startCalculuation limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "startCalculuation limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
 
                 // # cell_voltage_overvoltage
                 limitChargeCurrent(id(max_cell_voltage).state,
@@ -283,10 +294,6 @@ interval:
                                   0.1f,
                                   "cell_voltage_overvoltage");
 
-                ESP_LOGI("main", "cell_voltage_overvoltage limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "cell_voltage_overvoltage limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
-
-                
                 // # cell_voltage_undervoltage
                 limitChargeCurrent(id(min_cell_voltage).state,
                                   id(cell_voltage_undervoltage_recovery).state,
@@ -294,10 +301,6 @@ interval:
                                   0.1f,
                                   "cell_voltage_undervoltage");
 
-                ESP_LOGI("main", "cell_voltage_undervoltage limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "cell_voltage_undervoltage limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
-
-                
                 // # power_tube_temperature
                 limitChargeAndDischargeCurrent(id(power_tube_temperature).state,
                                               id(power_tube_temperature_recovery).state,
@@ -305,9 +308,6 @@ interval:
                                               0.1f,
                                               "power_tube_temperature",
                                               true);
-
-                ESP_LOGI("main", "power_tube_temperature limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "power_tube_temperature limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
 
                 float maxBatteryTemperature = max(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
 
@@ -319,9 +319,6 @@ interval:
                                               "battery_temperature_sensor_temperature",
                                               true);
 
-                ESP_LOGI("main", "battery_temperature_sensor_temperature limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "battery_temperature_sensor_temperature limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
-
                 // # battery_charging_high_temperature
                 limitChargeCurrent(maxBatteryTemperature,
                                   id(charging_high_temperature_protection).state - 10.0,
@@ -330,9 +327,6 @@ interval:
                                   "battery_charging_high_temperature",
                                   true);
 
-                ESP_LOGI("main", "battery_charging_high_temperature limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "battery_charging_high_temperature limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
-
                 // # battery_discharging_high_temperature
                 limitDischargeCurrent(maxBatteryTemperature,
                                       id(discharging_high_temperature_protection).state - 10.0,
@@ -340,9 +334,6 @@ interval:
                                       0.1f,
                                       "battery_discharging_high_temperature",
                                       true);
-
-                ESP_LOGI("main", "battery_discharging_high_temperature limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "battery_discharging_high_temperature limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
 
                 float minBatteryTemperature = min(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
 
@@ -353,9 +344,6 @@ interval:
                                   0.1f,
                                   "battery_charging_low_temperature");
 
-                ESP_LOGI("main", "battery_charging_low_temperature limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "battery_charging_low_temperature limitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
-
                 // # battery_discharging_low_temperature
                 limitDischargeCurrent(minBatteryTemperature,
                                       id(discharging_low_temperature_recovery).state,
@@ -363,36 +351,45 @@ interval:
                                       0.1f,
                                       "battery_discharging_low_temperature");
 
-                ESP_LOGI("main", "limitedChargeCurrent %.1f", uint16_t(limitedChargeCurrent * 10) / 10.0f);
-                ESP_LOGI("main", "llimitedDischargeCurrent %.1f", uint16_t(limitedDischargeCurrent * 10) / 10.0f);
-                
-                
-                if ((id(charge_status) == "Bulk") | (id(charge_status) == "Absorption") | (id(inverter_chg_on).state)) {
-                  can_mesg[0] = uint16_t(id(cell_absorption_voltage).state * id(cells).state * 10) & 0xff;
-                  can_mesg[1] = uint16_t(id(cell_absorption_voltage).state * id(cells).state * 10) >> 8 & 0xff;
-                  can_mesg[2] = uint16_t(limitedChargeCurrent * 10) & 0xff;
-                  can_mesg[3] = uint16_t(limitedChargeCurrent * 10) >> 8 & 0xff;
-                } else {
-                  can_mesg[0] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) & 0xff;
-                  can_mesg[1] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) >> 8 & 0xff;
+                if (id(uart_missing_error)) {
+                  id(charge_status) = "Disabled";
+                  can_mesg[0] = uint16_t(40 * 10) & 0xff;
+                  can_mesg[1] = uint16_t(40 * 10) >> 8 & 0xff;
                   can_mesg[2] = 0;
                   can_mesg[3] = 0;
-                }
-                if ((!id(charging_switch).state) | (!id(inverter_charging).state)) { // Overides to disable charging
-                  can_mesg[0] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) & 0xff;
-                  can_mesg[1] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) >> 8 & 0xff;
-                  can_mesg[2] = 0;
-                  can_mesg[3] = 0;
-                }
-                if ((id(discharging_switch).state) & (id(inverter_discharging).state)) {
-                  can_mesg[4] = uint16_t(limitedDischargeCurrent * 10) & 0xff;
-                  can_mesg[5] = uint16_t(limitedDischargeCurrent * 10) >> 8 & 0xff;
-                } else {
                   can_mesg[4] = 0x00;
                   can_mesg[5] = 0x00;
+                  can_mesg[6] = uint16_t(10 * 10) & 0xff;
+                  can_mesg[7] = uint16_t(10 * 10) >> 8 & 0xff;
+                } else {
+                  if ((id(charge_status) == "Bulk") | (id(charge_status) == "Absorption") | (id(inverter_chg_on).state)) {
+                    can_mesg[0] = uint16_t(id(cell_absorption_voltage).state * id(cells).state * 10) & 0xff;
+                    can_mesg[1] = uint16_t(id(cell_absorption_voltage).state * id(cells).state * 10) >> 8 & 0xff;
+                    can_mesg[2] = uint16_t(limitedChargeCurrent * 10) & 0xff;
+                    can_mesg[3] = uint16_t(limitedChargeCurrent * 10) >> 8 & 0xff;
+                  } else {
+                    can_mesg[0] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) & 0xff;
+                    can_mesg[1] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) >> 8 & 0xff;
+                    can_mesg[2] = 0;
+                    can_mesg[3] = 0;
+                  }
+                  if ((!id(charging_switch).state) | (!id(inverter_charging).state)) { // Overides to disable charging
+                    can_mesg[0] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) & 0xff;
+                    can_mesg[1] = uint16_t(id(cell_idle_voltage).state * id(cells).state * 10) >> 8 & 0xff;
+                    can_mesg[2] = 0;
+                    can_mesg[3] = 0;
+                  }
+                  if ((id(discharging_switch).state) & (id(inverter_discharging).state)) {
+                    can_mesg[4] = uint16_t(limitedDischargeCurrent * 10) & 0xff;
+                    can_mesg[5] = uint16_t(limitedDischargeCurrent * 10) >> 8 & 0xff;
+                  } else {
+                    can_mesg[4] = 0x00;
+                    can_mesg[5] = 0x00;
+                  }
+                  can_mesg[6] = uint16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) & 0xff;
+                  can_mesg[7] = uint16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) >> 8 & 0xff;
                 }
-                can_mesg[6] = uint16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) & 0xff;
-                can_mesg[7] = uint16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) >> 8 & 0xff;
+
                 id(charging_status).publish_state(id(charge_status));
 
                 ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) / 10.0f);
@@ -433,15 +430,21 @@ interval:
               can_id: 0x35C
               data: !lambda |-
                 uint8_t can_mesg[1];
-                if ((id(charging_switch).state) & (id(inverter_charging).state)) {
-                  can_mesg[0] = 0x80;
-                } else {
+
+                if (id(uart_missing_error)) {
                   can_mesg[0] = 0x00;
+                  can_mesg[1] = 0x00;
+                } else {
+                  if ((id(charging_switch).state) & (id(inverter_charging).state)) {
+                    can_mesg[0] = 0x80;
+                  } else {
+                    can_mesg[0] = 0x00;
+                  }
+                  if ((id(discharging_switch).state) & (id(inverter_discharging).state)) {
+                    can_mesg[0] = can_mesg[0] | 0x40;
+                  }
+                  can_mesg[1] = 0x00;
                 }
-                if ((id(discharging_switch).state) & (id(inverter_discharging).state)) {
-                  can_mesg[0] = can_mesg[0] | 0x40;
-                }
-                can_mesg[1] = 0x00;
                 ESP_LOGI("main", "send can id: 0x35C hex: %x %x", can_mesg[0], can_mesg[1]);
                 return {can_mesg[0], can_mesg[1]};
           - delay: 10ms
