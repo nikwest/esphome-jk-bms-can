@@ -271,59 +271,59 @@ interval:
                 if (  !id(charging_switch).state
                     | !id(inverter_charging).state)
                 {
-                    id(charge_status) = "Disabled";
+                  id(charge_status) = "Disabled";
 
                 } else if (id(inverter_chg_on).state) {
-                    id(charge_status) = "Bulk Manually";
+                  id(charge_status) = "Bulk Manually";
 
                 } else if (  id(charging_switch).state
                            & id(inverter_charging).state
                            & id(charge_status) == "Disabled")
                 {
-                    id(charge_status) = "Wait";
+                  id(charge_status) = "Wait";
 
                 } else if (  !id(inverter_chg_on).state
                            & id(charge_status) == "Bulk Manually")
                 {
-                    id(charge_status) = "Wait";
+                  id(charge_status) = "Wait";
 
                 } else if (id(total_voltage).state <= (id(cell_idle_voltage).state * id(cells).state)) { // Bulk Charge eg 53.6v 10% 
-                    if (id(absorption_script).is_running()) id(absorption_script).stop();
-                    id(charge_status) = "Bulk";
+                  if (id(absorption_script).is_running()) id(absorption_script).stop();
+                  id(charge_status) = "Bulk";
 
                 } else if (  id(total_voltage).state > id(cell_idle_voltage).state * id(cells).state
                            & id(total_voltage).state < (id(cell_absorption_voltage).state * id(cells).state) - 0.05) // If in startup rebulk
                 {
-                    if (id(charge_status) == "Startup") {
-                        id(charge_status) = "Bulk"; // If in startup, 10% low rebulk
-                    }
+                  if (id(charge_status) == "Startup") {
+                    id(charge_status) = "Bulk"; // If in startup, 10% low rebulk
+                  }
 
                 } else if (id(total_voltage).state >= (id(cell_absorption_voltage).state * id(cells).state)  - 0.05) { // 10 % from top start absorption timer
-                    if (id(charge_status) == "Bulk") {
-                        id(charge_status) = "Absorption";
-                        if (!id(absorption_script).is_running()) id(absorption_script).execute();
-                    }
+                  if (id(charge_status) == "Bulk") {
+                    id(charge_status) = "Absorption";
+                    if (!id(absorption_script).is_running()) id(absorption_script).execute();
+                  }
 
                 } else if (  id(charge_status) == "Absorption"                                        // when in absorption
                            & id(cell_absorption_voltage).state > id(balance_starting_voltage).state   // and absorption voltage is set higher than balance_starting_voltage
                            & (  id(max_cell_voltage).state < id(balance_starting_voltage).state       // and (   max cell is still below balance_starting_voltage
                               | id(balancing).state)) // reset script timer if balancing is active    //      or balancing is active)
                 { 
-                    if (id(absorption_script).is_running()) id(absorption_script).stop();             // then reset absorption script
-                    id(absorption_script).execute();
+                  if (id(absorption_script).is_running()) id(absorption_script).stop();             // then reset absorption script
+                  id(absorption_script).execute();
 
                 } else {
-                    id(charge_status) = "Wait";
+                  id(charge_status) = "Wait";
                 }
                 
                 // # set esphome "charging_current" to match with max bms "charging_overcurrent_protection"
                 if (id(charging_current).state > id(charging_overcurrent_protection).state * 0.95f) {
-                    id(charging_current).publish_state(id(charging_overcurrent_protection).state * 0.95f);
+                  id(charging_current).publish_state(id(charging_overcurrent_protection).state * 0.95f);
                 }
 
                 // # set esphome "discharging_current" to match with max bms "discharging_overcurrent_protection"
                 if (id(discharging_current).state > id(discharging_overcurrent_protection).state * 0.95f) {
-                    id(discharging_current).publish_state(id(discharging_overcurrent_protection).state * 0.95f);
+                  id(discharging_current).publish_state(id(discharging_overcurrent_protection).state * 0.95f);
                 }
 
                 // # startCalculuation
