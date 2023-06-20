@@ -210,7 +210,7 @@ interval:
               id(uart_missing_error) = false;
               id(no_uart_update_counter) = 0;
               return true;
-            } else if (id(no_uart_update_counter) ++ >= 3000) {
+            } else if (id(no_uart_update_counter) ++ >= 500) { // 500 is 500x10ms = 5000ms = 5s
               id(uart_missing_error) = true;
               return true;
             }
@@ -367,6 +367,8 @@ interval:
                                       id(discharging_low_temperature_protection).state,
                                       0.1f,
                                       "battery_discharging_low_temperature");
+
+                setRampups(1.0f);
 
                 if (id(uart_missing_error)) {
                   id(charge_status) = "Disabled";

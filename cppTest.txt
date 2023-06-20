@@ -1,16 +1,7 @@
-#ifndef __JK_BMS_HELPER__
-
-#define __JK_BMS_HELPER__
-
-
-
-#include "esphome.h"
-#include <stdio.h>
-#include <string.h>
-
-
-
-//namespace JkBmsHelper {
+// Example program
+#include <iostream>
+#include <string>
+#include<math.h>
 
     float chargeCurrent = 0;
     float dischargeCurrent = 0;
@@ -82,7 +73,6 @@
                 limitedChargeCurrent = chargeLimit;
                 strcpy(limitedChargeCurrentReason, "charge limited by ");
                 strcat(limitedChargeCurrentReason, limitText);
-                ESP_LOGI("main", "charge limited by %s to %.1f", limitText, uint16_t(limitedChargeCurrent * 10) / 10.0f);
                 chargeIsLimited = true;
             }
         }
@@ -116,7 +106,6 @@
                 limitedDischargeCurrent = dischargeLimit;
                 strcpy(limitedDischargeCurrentReason, "discharge limited by ");
                 strcat(limitedDischargeCurrentReason, limitText);
-                ESP_LOGI("main", "discharge limited by %s to %.1f", limitText, uint16_t(limitedDischargeCurrent * 10) / 10.0f);
                 dischargeIsLimited = true;
             } 
         }
@@ -180,6 +169,44 @@
             rampUpLimitedDischargeCurrent = limitedDischargeCurrent;
         }
     }
+    
+    void runtest(float val) {
+        initValues(100,100);
+        limitChargeCurrent(val, 3.45, 3.65, 0.1, "cell overvoltage", false);
+        setRampups(1);
+        std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << " " << limitedChargeCurrentReason << "\n";
+    }
+    
+int main()
+{
+    runtest(3.46);
+    runtest(3.2);
+    runtest(3.2);
+    runtest(3.2);
+    runtest(3.46);
+    runtest(3.2);
+    runtest(3.2);
+    runtest(3.2);
+    runtest(3.2);
+    runtest(3.2);
+    runtest(3.2);
+    initValues(50,50);
+    limitChargeCurrent(3.2, 3.45, 3.65, 0.1, "cell overvoltage", false);
+    setRampups(1);
+    std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << " " << limitedChargeCurrentReason << "\n";
+    runtest(3.2);
+    runtest(3.2);
+    runtest(3.2);
 
-//}
-#endif	//__JK_BMS_HELPER__
+    
+
+    
+    initValues(100,100);
+    limitChargeCurrent(-12, -10, -20, 0.1, "yo", false);
+    std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << "\n";
+    
+    initValues(100,100);
+    limitChargeCurrent(3.3, 3.45, 3.65, 0.1, "yo", false);
+    std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << "\n";
+    
+}
