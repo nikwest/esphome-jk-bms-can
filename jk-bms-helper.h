@@ -27,7 +27,10 @@
     bool chargeIsLimited = false;
     bool dischargeIsLimited = false;
 
-    void initValues(float initChargeCurrent, float initDischargeCurrent) {
+    float minCharge;
+    float minDischarge;
+
+    void initValues(float initChargeCurrent, float initDischargeCurrent, float initMinCharge, float initMinDischarge ) {
         chargeCurrent = initChargeCurrent;
         dischargeCurrent = initDischargeCurrent;
         
@@ -44,6 +47,9 @@
         if (rampUpLimitedDischargeCurrent == -1) {
           rampUpLimitedDischargeCurrent = dischargeCurrent;
         }
+
+        minCharge = initMinCharge;
+        minDischarge = initMinDischarge;
     }
     
     void limitAbsolutChargeCurrent(float maximum) {
@@ -78,6 +84,10 @@
             
             float chargeLimit = fmax(0.0f, chargeCurrent * limitFactor);
 
+            if (chargeLimit < minCharge) {
+                chargeLimit = 0.0f;
+            }
+
             if (limitedChargeCurrent > chargeLimit) {
                 limitedChargeCurrent = chargeLimit;
                 strcpy(limitedChargeCurrentReason, "charge limited by ");
@@ -111,6 +121,10 @@
             }
             
             float dischargeLimit = fmax(0.0f, dischargeCurrent * limitFactor);
+
+            if (dischargeLimit < minDischarge) {
+                dischargeLimit = 0.0f;
+            }
             
             if (limitedDischargeCurrent > dischargeLimit) {
                 limitedDischargeCurrent = dischargeLimit;
@@ -139,6 +153,7 @@
     void setRampups(float step) {
         // CHARGING
         if (chargeIsLimited) {
+            rampUpLimitedChargeCurrent = fmax(minCharge, rampUpLimitedChargeCurrent);
             if (limitedChargeCurrent > rampUpLimitedChargeCurrent) {
                 strcpy(limitedChargeCurrentReason, "charge limited for ramp up by ");
                 char str_f[20];
@@ -160,7 +175,7 @@
 
         // DISCHARGING
         if (dischargeIsLimited) {
-
+            rampUpLimitedDischargeCurrent = fmax(minDischarge, rampUpLimitedDischargeCurrent);
             if (limitedDischargeCurrent > rampUpLimitedDischargeCurrent) {
                 strcpy(limitedDischargeCurrentReason, "discharge limited for ramp up by ");
                 char str_f[20];

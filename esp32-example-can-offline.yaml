@@ -25,7 +25,10 @@ substitutions:
 # Battery Charging setting:
 # This is max charging amps eg 50A, for Bulk - Constant Current charging(CC), should be at least 10A less than BMS charge current protection, 0.5C max 
 # will be automatically limited to 95% BMS charge current protection
-  charge_a: "200"
+  charge_a: "100"
+
+# the minimum the charge current can be reduced to, if a limit caluclates a lower value charging will be set to 0 (off)
+  min_charge_a: "2"
 
 # Absorption Voltage for Constant Voltage charging(CV). This is Absorption voltage you want the inverter to charge with 3.45v per cell. Value will be multiplied by cells reported from the BMS. 
   cell_absorption_v: "3.45"
@@ -48,7 +51,11 @@ substitutions:
 # Battery Discharge setting:
 # Max discharge amps eg 100, should be at least 10A less than BMS over dischange current protection, 0.5C max
 # will be reset if higher than 95% of overdischarge current protection of the BMS
-  discharge_a: "200"
+  discharge_a: "100"
+
+# the minimum the discharge current can be reduced to, if a limit caluclates a lower value discharging will be set to 0 (off)
+  min_discharge_a: "2"
+
 # Minimum discharge voltage eg 48v/16 = 3V per cell
   cell_min_dischange_v: "3.0"
 
@@ -83,22 +90,19 @@ esphome:
     board_build.extra_flags:
       - "-DARDUINO_USB_CDC_ON_BOOT=0"
 
-
-#esp32:
-#  board: esp32doit-devkit-v1
-#  framework:
-#    type: arduino
-#    version: recommended
-
 esp32:
+#  board: esp32doit-devkit-v1
+
   board: lolin_s2_mini
   variant: ESP32S2
+
   framework:
 #    type: esp-idf
 #    version: recommended
 #    sdkconfig_options:
 #      CONFIG_ESP_CONSOLE_USB_CDC: y
     type: arduino
+    version: recommended
 
 external_components:
   - source: ${external_components_source}
@@ -129,9 +133,9 @@ button:
     internal: true
 
 wifi:
-  #reboot_timeout: 0s
-#  ssid: !secret wifi_ssid
-#  password: !secret wifi_password
+  #reboot_timeout: 60s
+  #ssid: !secret wifi_ssid
+  #password: !secret wifi_password
   #domain: !secret domain
 
   ap:
@@ -311,7 +315,6 @@ interval:
                 { 
                   if (id(absorption_script).is_running()) id(absorption_script).stop();             // then reset absorption script
                   id(absorption_script).execute();
-
                 } else {
                   id(charge_status) = "Wait";
                 }
@@ -328,7 +331,9 @@ interval:
 
                 // # startCalculuation
                 initValues(min(id(charging_overcurrent_protection).state * 0.95f, id(charging_current).state),
-                          min(id(discharging_overcurrent_protection).state * 0.95f, id(discharging_current).state));
+                           min(id(discharging_overcurrent_protection).state * 0.95f, id(discharging_current).state),
+                           ${min_charge_a},
+                           ${min_discharge_a});
 
                 // # cell_voltage_overvoltage
                 limitChargeCurrent(id(max_cell_voltage).state,
@@ -853,7 +858,7 @@ number:
     name: "${name} Charging current max"
     id: "charging_current"
     step: 1
-    min_value: 2
+    min_value: "${min_charge_a}"
     max_value: 200
     mode: slider
     initial_value: "${charge_a}"
@@ -865,7 +870,7 @@ number:
     name: "${name} Discharging current max"
     id: "discharging_current"
     step: 1
-    min_value: 2
+    min_value: "${min_discharge_a}"
     max_value: 200
     mode: slider
     initial_value: "${discharge_a}"
