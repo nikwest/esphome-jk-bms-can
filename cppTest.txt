@@ -18,7 +18,10 @@
     bool chargeIsLimited = false;
     bool dischargeIsLimited = false;
 
-    void initValues(float initChargeCurrent, float initDischargeCurrent) {
+    float minCharge;
+    float minDischarge;
+
+    void initValues(float initChargeCurrent, float initDischargeCurrent, float initMinCharge, float initMinDischarge ) {
         chargeCurrent = initChargeCurrent;
         dischargeCurrent = initDischargeCurrent;
         
@@ -35,6 +38,9 @@
         if (rampUpLimitedDischargeCurrent == -1) {
           rampUpLimitedDischargeCurrent = dischargeCurrent;
         }
+
+        minCharge = initMinCharge;
+        minDischarge = initMinDischarge;
     }
     
     void limitAbsolutChargeCurrent(float maximum) {
@@ -69,6 +75,10 @@
             
             float chargeLimit = fmax(0.0f, chargeCurrent * limitFactor);
 
+            if (chargeLimit < minCharge) {
+                chargeLimit = 0.0f;
+            }
+
             if (limitedChargeCurrent > chargeLimit) {
                 limitedChargeCurrent = chargeLimit;
                 strcpy(limitedChargeCurrentReason, "charge limited by ");
@@ -101,6 +111,10 @@
             }
             
             float dischargeLimit = fmax(0.0f, dischargeCurrent * limitFactor);
+
+            if (dischargeLimit < minDischarge) {
+                dischargeLimit = 0.0f;
+            }
             
             if (limitedDischargeCurrent > dischargeLimit) {
                 limitedDischargeCurrent = dischargeLimit;
@@ -128,6 +142,7 @@
     void setRampups(float step) {
         // CHARGING
         if (chargeIsLimited) {
+            rampUpLimitedChargeCurrent = fmax(minCharge, rampUpLimitedChargeCurrent);
             if (limitedChargeCurrent > rampUpLimitedChargeCurrent) {
                 strcpy(limitedChargeCurrentReason, "charge limited for ramp up by ");
                 char str_f[20];
@@ -149,7 +164,7 @@
 
         // DISCHARGING
         if (dischargeIsLimited) {
-
+            rampUpLimitedDischargeCurrent = fmax(minDischarge, rampUpLimitedDischargeCurrent);
             if (limitedDischargeCurrent > rampUpLimitedDischargeCurrent) {
                 strcpy(limitedDischargeCurrentReason, "discharge limited for ramp up by ");
                 char str_f[20];
@@ -171,7 +186,7 @@
     }
     
     void runtest(float val) {
-        initValues(100,100);
+        initValues(100, 100, 2.0, 2.0);
         limitChargeCurrent(val, 3.45, 3.65, 0.1, "cell overvoltage", false);
         setRampups(1);
         std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << " " << limitedChargeCurrentReason << "\n";
@@ -190,7 +205,7 @@ int main()
     runtest(3.2);
     runtest(3.2);
     runtest(3.2);
-    initValues(50,50);
+    initValues(50, 50, 2.0, 2.0);
     limitChargeCurrent(3.2, 3.45, 3.65, 0.1, "cell overvoltage", false);
     setRampups(1);
     std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << " " << limitedChargeCurrentReason << "\n";
@@ -201,11 +216,11 @@ int main()
     
 
     
-    initValues(100,100);
+    initValues(100, 100, 2.0, 2.0);
     limitChargeCurrent(-12, -10, -20, 0.1, "yo", false);
     std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << "\n";
     
-    initValues(100,100);
+    initValues(100,100, 2.0, 2.0);
     limitChargeCurrent(3.3, 3.45, 3.65, 0.1, "yo", false);
     std::cout << "limitedChargeCurrent = " << uint16_t(round(limitedChargeCurrent * 10)) / 10.0f << "\n";
     
