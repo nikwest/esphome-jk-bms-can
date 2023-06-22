@@ -194,7 +194,7 @@ jk_modbus:
 jk_bms:
   id: bms0
   jk_modbus_id: modbus0
-  enable_fake_traffic: true # TODO disable
+#  enable_fake_traffic: true # TODO disable
 
 canbus:
   - platform: esp32_can
