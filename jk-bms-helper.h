@@ -37,8 +37,8 @@
         limitedChargeCurrent = chargeCurrent;
         limitedDischargeCurrent = dischargeCurrent;
         
-        strcpy(limitedChargeCurrentReason,"");
-        strcpy(limitedDischargeCurrentReason,"");
+        strcpy(limitedChargeCurrentReason," ");
+        strcpy(limitedDischargeCurrentReason," ");
         
         if (rampUpLimitedChargeCurrent == -1) {
           rampUpLimitedChargeCurrent = chargeCurrent;
