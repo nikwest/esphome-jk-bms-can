@@ -105,8 +105,8 @@ esphome:
     upload_speed: 115200
     board_build.f_cpu: 80000000L
     #board_build.mcu: esp32s2
-    board_build.extra_flags:
-      - "-DARDUINO_USB_CDC_ON_BOOT=0"
+    #board_build.extra_flags:
+    #  - "-DARDUINO_USB_CDC_ON_BOOT=0"
 
 esp32:
 #  board: esp32doit-devkit-v1
@@ -115,15 +115,15 @@ esp32:
   variant: ESP32S2
 
   framework:
-    type: arduino
+    # type: arduino
     # version: recommended
-    version: 2.0.3
-    platform_version: 4.4.0
+    # version: 2.0.3
+    # platform_version: 4.4.0
     
-#    type: esp-idf
-#    version: recommended
-#    sdkconfig_options:
-#      CONFIG_ESP_CONSOLE_USB_CDC: y
+    type: esp-idf
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP_CONSOLE_USB_CDC: y
     
 
 external_components:
@@ -168,18 +168,18 @@ wifi:
 #    ssid: "Jk-Bms Fallback Hotspot"
     password: "B3ytP03VQjeh"
 
-web_server:
-  port: 80
-  local: true
-  auth:
-    username: "jkbms" # !secret jk_bms_web_server_username
-    password: "jkbms" # !secret jk_bms_web_server_password
+#web_server:
+#  port: 80
+#  local: true
+#  auth:
+#    username: "jkbms" # !secret jk_bms_web_server_username
+#    password: "jkbms" # !secret jk_bms_web_server_password
 
 ota:
 
 logger:
   baud_rate: 115200
-  hardware_uart: UART0 # USB_CDC
+  hardware_uart: USB_CDC # USB_CDC
   level: INFO
 
 # Please use the native `api` component instead of the `mqtt` section
@@ -477,7 +477,7 @@ interval:
                   if (id(uart_missing_error)) {
                     id(charge_status) = "Disabled";
                   } else {
-                    if (!id(charging_switch).state || !id(inverter_charging).state) { // Overides to disable charging
+                    if (!id(charging_switch).state | !id(inverter_charging).state) { // Overides to disable charging
                       //charge_volt = id(cell_idle_voltage).state * id(cells).state;
                       //charge_amp = 0;
                     } else if (id(charge_status) == "Bulk" || id(charge_status) == "Absorption" || id(inverter_chg_on).state) {
@@ -488,7 +488,7 @@ interval:
                       //charge_amp = 0;
                     }
                     
-                    if (id(discharging_switch).state && id(inverter_discharging).state) {
+                    if (id(discharging_switch).state & id(inverter_discharging).state) {
                       discharge_amp = limitedDischargeCurrent;
                     } else {
                       //discharge_amp = 0;
@@ -558,12 +558,12 @@ interval:
                     can_mesg[0] = 0x00;
                     can_mesg[1] = 0x00;
                   } else {
-                    if ((id(charging_switch).state) && (id(inverter_charging).state)) {
+                    if ((id(charging_switch).state) & (id(inverter_charging).state)) {
                       can_mesg[0] = 0x80;
                     } else {
                       can_mesg[0] = 0x00;
                     }
-                    if ((id(discharging_switch).state) && (id(inverter_discharging).state)) {
+                    if ((id(discharging_switch).state) & (id(inverter_discharging).state)) {
                       can_mesg[0] = can_mesg[0] | 0x40;
                     }
                     can_mesg[1] = 0x00;
