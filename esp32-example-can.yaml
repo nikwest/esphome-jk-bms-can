@@ -14,8 +14,9 @@
 # V1.13.1 Fix compile issues with new version of ESPhome 2023.4.0, set rebulk offset to 2.5
 substitutions:
 # --------------------------
-# name that will appear in esphome and homeassistant.
-  name: jk1
+# prefix name that will appear in esphome and homeassistant for JK BMS entitys.
+  jk1_name: jk1
+
   
 # --------------------------
 # Number of Battery modules max 8. Each LX U5.4-L battery is 5.4kWh, select the number closest to your capactiy eg 3.2V * 280Ah * 16 = 14.3kWh
@@ -77,18 +78,17 @@ substitutions:
 # --------------------------------------
 # ESP32 CAN/Serail port pins:
 # GPIO pins your CAN bus transceiver(TJA1050) is connected to the ESP, note! TX->TX and RX->RX. 
-  can_tx_pin: GPIO5 # GPIO23
-  can_rx_pin: GPIO3 # GPIO22
+  can_tx_pin: GPIO23
+  can_rx_pin: GPIO22
 # GPIO pins your JK-BMS RS485(TTL) is connected to the ESP TX->RX and RX->TX. 
-  tx_pin: GPIO18 # GPIO17
-  rx_pin: GPIO16 # GPIO16
+  tx_pin: GPIO17
+  rx_pin: GPIO16
 # --------------------------------------
 #### Don't make changes below this ####
   external_components_source: github://Ackmaniac/esphome-jk-bms-can@develop # TODO set to main
 
 esphome:
-  name: ${name}
-  friendly_name: ${name}
+  name: jk-deye-controller
   includes:
     - jk-bms-helper.h
   on_boot:
@@ -98,16 +98,10 @@ esphome:
   platformio_options:
     upload_speed: 115200
     board_build.f_cpu: 80000000L
-    #board_build.mcu: esp32s2
-    board_build.extra_flags:
-      - "-DARDUINO_USB_CDC_ON_BOOT=0"
 
 esp32:
-#  board: esp32doit-devkit-v1
+  board: esp32doit-devkit-v1
   
-  board: lolin_s2_mini
-  variant: ESP32S2
-
   framework:
     type: arduino
     version: recommended
@@ -146,7 +140,7 @@ globals:
 
 button:
   - platform: restart
-    name: "Restart button"
+    name: "${jk1_name} Restart button"
     id: restart_button
     internal: true
 
@@ -194,7 +188,7 @@ light:
   - platform: binary
     output: led
     id: led_buitin
-    name: "Builtin LED"
+    name: "${jk1_name} Builtin LED"
     internal: true
 
 uart:
@@ -211,7 +205,7 @@ jk_modbus:
 jk_bms:
   id: bms0
   jk_modbus_id: modbus0
-  #enable_fake_traffic: true # TODO disable
+  # enable_fake_traffic: true # TODO disable
 
 canbus:
   - platform: esp32_can
@@ -313,14 +307,14 @@ interval:
                   } else if (id(inverter_chg_on).state) {
                     id(charge_status) = "Bulk Manually";
 
-                  } else if (  id(charging_switch).state
-                            & id(inverter_charging).state
-                            & id(charge_status) == "Disabled")
+                  } else if (   id(charging_switch).state
+                             && id(inverter_charging).state
+                             && id(charge_status) == "Disabled")
                   {
                     id(charge_status) = "Wait";
 
                   } else if (  !id(inverter_chg_on).state
-                            & id(charge_status) == "Bulk Manually")
+                             && id(charge_status) == "Bulk Manually")
                   {
                     id(charge_status) = "Wait";
 
@@ -328,8 +322,8 @@ interval:
                     if (id(absorption_script).is_running()) id(absorption_script).stop();
                     id(charge_status) = "Bulk";
 
-                  } else if (  id(total_voltage).state > id(cell_idle_voltage).state * id(cells).state
-                            & id(total_voltage).state < (id(cell_absorption_voltage).state * id(cells).state) - 0.05) // If in startup rebulk
+                  } else if (   id(total_voltage).state > id(cell_idle_voltage).state * id(cells).state
+                             && id(total_voltage).state < (id(cell_absorption_voltage).state * id(cells).state) - 0.05) // If in startup rebulk
                   {
                     if (id(charge_status) == "Startup") {
                       id(charge_status) = "Bulk"; // If in startup, 10% low rebulk
@@ -341,10 +335,10 @@ interval:
                       if (!id(absorption_script).is_running()) id(absorption_script).execute();
                     }
 
-                  } else if (  id(charge_status) == "Absorption"                                        // when in absorption
-                            & id(cell_absorption_voltage).state > id(balance_starting_voltage).state   // and absorption voltage is set higher than balance_starting_voltage
-                            & (  id(max_cell_voltage).state < id(balance_starting_voltage).state       // and (   max cell is still below balance_starting_voltage
-                                | id(balancing).state)) // reset script timer if balancing is active    //      or balancing is active)
+                  } else if (   id(charge_status) == "Absorption"                                        // when in absorption
+                             && id(cell_absorption_voltage).state > id(balance_starting_voltage).state   // and absorption voltage is set higher than balance_starting_voltage
+                             && (   id(max_cell_voltage).state < id(balance_starting_voltage).state       // and (   max cell is still below balance_starting_voltage
+                                 || id(balancing).state)) // reset script timer if balancing is active    //      or balancing is active)
                   { 
                     if (id(absorption_script).is_running()) id(absorption_script).stop();             // then reset absorption script
                     id(absorption_script).execute();
@@ -452,10 +446,10 @@ interval:
                   if (id(uart_missing_error)) {
                     id(charge_status) = "Disabled";
                   } else {
-                    if (!id(charging_switch).state | !id(inverter_charging).state) { // Overides to disable charging
+                    if (!id(charging_switch).state || !id(inverter_charging).state) { // Overides to disable charging
                       //charge_volt = id(cell_idle_voltage).state * id(cells).state;
                       //charge_amp = 0;
-                    } else if (id(charge_status) == "Bulk" | id(charge_status) == "Absorption" | id(inverter_chg_on).state) {
+                    } else if (id(charge_status) == "Bulk" || id(charge_status) == "Absorption" || id(inverter_chg_on).state) {
                       charge_volt = id(cell_absorption_voltage).state * id(cells).state;
                       charge_amp = limitedChargeCurrent;
                     } else {
@@ -463,7 +457,7 @@ interval:
                       //charge_amp = 0;
                     }
                     
-                    if (id(discharging_switch).state & id(inverter_discharging).state) {
+                    if (id(discharging_switch).state && id(inverter_discharging).state) {
                       discharge_amp = limitedDischargeCurrent;
                     } else {
                       //discharge_amp = 0;
@@ -533,12 +527,12 @@ interval:
                     can_mesg[0] = 0x00;
                     can_mesg[1] = 0x00;
                   } else {
-                    if ((id(charging_switch).state) & (id(inverter_charging).state)) {
+                    if ((id(charging_switch).state) && (id(inverter_charging).state)) {
                       can_mesg[0] = 0x80;
                     } else {
                       can_mesg[0] = 0x00;
                     }
-                    if ((id(discharging_switch).state) & (id(inverter_discharging).state)) {
+                    if ((id(discharging_switch).state) && (id(inverter_discharging).state)) {
                       can_mesg[0] = can_mesg[0] | 0x40;
                     }
                     can_mesg[1] = 0x00;
@@ -604,33 +598,32 @@ interval:
                       data: [0x47, 0x4F, 0x4F, 0x44, 0x57, 0x45, 0x20, 0x20] # "GOODWE"
                       #data: [0x50, 0x59, 0x4C, 0x4F, 0x4E, 0x20, 0x20, 0x20] # "PYLON"
                       #data: [0X4A, 0X4B, 0x20, 0x42, 0x4D, 0x53, 0x20, 0x20] # "JK BMS"
-                    
 
 binary_sensor:
   - platform: jk_bms
     balancing:
       id: balancing
-      name: "balancing"
+      name: "${jk1_name} balancing"
     balancing_switch:
-      name: "balancing switch"
+      name: "${jk1_name} balancing switch"
     charging:
-      name: "charging"
+      name: "${jk1_name} charging"
     charging_switch:
       id: charging_switch
-      name: "charging switch"
+      name: "${jk1_name} charging switch"
     discharging:
-      name: "discharging"
+      name: "${jk1_name} discharging"
     discharging_switch:
       id: discharging_switch
-      name: "discharging switch"
+      name: "${jk1_name} discharging switch"
     dedicated_charger_switch:
-      name: "dedicated charger switch"
+      name: "${jk1_name} dedicated charger switch"
 
 sensor:
   # NTC Aditional BMS Wire Temperature Sensor
   - platform: adc
     id: source_sensor
-    pin: GPIO9
+    pin: GPIO36
     update_interval: never
     attenuation: 11dB
   - platform: resistance
@@ -645,7 +638,7 @@ sensor:
       b_constant: 3950
       reference_temperature: 25°C
       reference_resistance: 10kOhm
-    name: "temperature wire"
+    name: "${jk1_name} temperature wire"
     filters:
       - sliding_window_moving_average:
           window_size: 10
@@ -654,202 +647,202 @@ sensor:
   - platform: jk_bms
     min_cell_voltage:
       id: min_cell_voltage
-      name: "min cell voltage"
+      name: "${jk1_name} min cell voltage"
     max_cell_voltage:
       id: max_cell_voltage
-      name: "max cell voltage"
+      name: "${jk1_name} max cell voltage"
     min_voltage_cell:
       id: min_voltage_cell
-      name: "min voltage cell"
+      name: "${jk1_name} min voltage cell"
     max_voltage_cell:
       id: max_voltage_cell
-      name: "max voltage cell"
+      name: "${jk1_name} max voltage cell"
     delta_cell_voltage:
-      name: "delta cell voltage"
+      name: "${jk1_name} delta cell voltage"
     average_cell_voltage:
-      name: "average cell voltage"
+      name: "${jk1_name} average cell voltage"
     cells:
       id: cells
-      name: "cells"
+      name: "${jk1_name} cells"
     cell_voltage_1:
-      name: "cell voltage  1"
+      name: "${jk1_name} cell voltage  1"
     cell_voltage_2:
-      name: "cell voltage  2"
+      name: "${jk1_name} cell voltage  2"
     cell_voltage_3:
-      name: "cell voltage  3"
+      name: "${jk1_name} cell voltage  3"
     cell_voltage_4:
-      name: "cell voltage  4"
+      name: "${jk1_name} cell voltage  4"
     cell_voltage_5:
-      name: "cell voltage  5"
+      name: "${jk1_name} cell voltage  5"
     cell_voltage_6:
-      name: "cell voltage  6"
+      name: "${jk1_name} cell voltage  6"
     cell_voltage_7:
-      name: "cell voltage  7"
+      name: "${jk1_name} cell voltage  7"
     cell_voltage_8:
-      name: "cell voltage  8"
+      name: "${jk1_name} cell voltage  8"
     cell_voltage_9:
-      name: "cell voltage  9"
+      name: "${jk1_name} cell voltage  9"
     cell_voltage_10:
-      name: "cell voltage 10"
+      name: "${jk1_name} cell voltage 10"
     cell_voltage_11:
-      name: "cell voltage 11"
+      name: "${jk1_name} cell voltage 11"
     cell_voltage_12:
-      name: "cell voltage 12"
+      name: "${jk1_name} cell voltage 12"
     cell_voltage_13:
-      name: "cell voltage 13"
+      name: "${jk1_name} cell voltage 13"
     cell_voltage_14:
-      name: "cell voltage 14"
+      name: "${jk1_name} cell voltage 14"
     cell_voltage_15:
-      name: "cell voltage 15"
+      name: "${jk1_name} cell voltage 15"
     cell_voltage_16:
-      name: "cell voltage 16"
+      name: "${jk1_name} cell voltage 16"
 #    cell_voltage_17:
-#      name: "cell voltage 17"
+#      name: "${jk1_name} cell voltage 17"
 #    cell_voltage_18:
-#      name: "cell voltage 18"
+#      name: "${jk1_name} cell voltage 18"
 #    cell_voltage_19:
-#      name: "cell voltage 19"
+#      name: "${jk1_name} cell voltage 19"
 #    cell_voltage_20:
-#      name: "cell voltage 20"
+#      name: "${jk1_name} cell voltage 20"
 #    cell_voltage_21:
-#      name: "cell voltage 21"
+#      name: "${jk1_name} cell voltage 21"
 #    cell_voltage_22:
-#      name: "cell voltage 22"
+#      name: "${jk1_name} cell voltage 22"
 #    cell_voltage_23:
-#      name: "cell voltage 23"
+#      name: "${jk1_name} cell voltage 23"
 #    cell_voltage_24:
-#      name: "cell voltage 24"
+#      name: "${jk1_name} cell voltage 24"
     power_tube_temperature:
       id: power_tube_temperature
-      name: "power tube temperature"
+      name: "${jk1_name} power tube temperature"
     temperature_sensor_1:
       id: temperature_sensor_1
-      name: "temperature sensor 1"
+      name: "${jk1_name} temperature sensor 1"
     temperature_sensor_2:
       id: temperature_sensor_2
-      name: "temperature sensor 2"
+      name: "${jk1_name} temperature sensor 2"
     total_voltage:
       id: total_voltage
-      name: "total voltage"
+      name: "${jk1_name} total voltage"
     current:
       id: current
-      name: "current"
+      name: "${jk1_name} current"
     power:
-      name: "power"
+      name: "${jk1_name} power"
     charging_power:
-      name: "charging power"
+      name: "${jk1_name} charging power"
     discharging_power:
-      name: "discharging power"
+      name: "${jk1_name} discharging power"
     capacity_remaining:
       id: capacity_remaining
-      name: "capacity remaining"
+      name: "${jk1_name} capacity remaining"
     capacity_remaining_derived:
-      name: "capacity remaining derived"
+      name: "${jk1_name} capacity remaining derived"
     temperature_sensors:
-      name: "temperature sensors"
+      name: "${jk1_name} temperature sensors"
     charging_cycles:
-      name: "charging cycles"
+      name: "${jk1_name} charging cycles"
       id: charging_cycles
     total_charging_cycle_capacity:
-      name: "total charging cycle capacity"
+      name: "${jk1_name} total charging cycle capacity"
     battery_strings:
-      name: "battery strings"
+      name: "${jk1_name} battery strings"
     errors_bitmask:
       id: errors_bitmask
-      name: "errors bitmask"
+      name: "${jk1_name} errors bitmask"
     operation_mode_bitmask:
-      name: "operation mode bitmask"
+      name: "${jk1_name} operation mode bitmask"
     total_voltage_overvoltage_protection:
       id: total_voltage_overvoltage_protection
-      name: "total voltage overvoltage protection"
+      name: "${jk1_name} total voltage overvoltage protection"
     total_voltage_undervoltage_protection:
       id: total_voltage_undervoltage_protection
-      name: "total voltage undervoltage protection"
+      name: "${jk1_name} total voltage undervoltage protection"
     cell_voltage_overvoltage_protection:
       id: cell_voltage_overvoltage_protection
-      name: "cell voltage overvoltage protection"
+      name: "${jk1_name} cell voltage overvoltage protection"
     cell_voltage_overvoltage_recovery:
       id: cell_voltage_overvoltage_recovery
-      name: "cell voltage overvoltage recovery"
+      name: "${jk1_name} cell voltage overvoltage recovery"
     cell_voltage_overvoltage_delay:
-      name: "cell voltage overvoltage delay"
+      name: "${jk1_name} cell voltage overvoltage delay"
     cell_voltage_undervoltage_protection:
       id: cell_voltage_undervoltage_protection
-      name: "cell voltage undervoltage protection"
+      name: "${jk1_name} cell voltage undervoltage protection"
     cell_voltage_undervoltage_recovery:
       id: cell_voltage_undervoltage_recovery
-      name: "cell voltage undervoltage recovery"
+      name: "${jk1_name} cell voltage undervoltage recovery"
     cell_voltage_undervoltage_delay:
-      name: "cell voltage undervoltage delay"
+      name: "${jk1_name} cell voltage undervoltage delay"
     cell_pressure_difference_protection:
-      name: "cell pressure difference protection"
+      name: "${jk1_name} cell pressure difference protection"
     discharging_overcurrent_protection:
       id: discharging_overcurrent_protection
-      name: "discharging overcurrent protection"
+      name: "${jk1_name} discharging overcurrent protection"
     discharging_overcurrent_delay:
-      name: "discharging overcurrent delay"
+      name: "${jk1_name} discharging overcurrent delay"
     charging_overcurrent_protection:
       id: charging_overcurrent_protection
-      name: "charging overcurrent protection"
+      name: "${jk1_name} charging overcurrent protection"
     charging_overcurrent_delay:
-      name: "charging overcurrent delay"
+      name: "${jk1_name} charging overcurrent delay"
     balance_starting_voltage:
       id: balance_starting_voltage
-      name: "balance starting voltage"
+      name: "${jk1_name} balance starting voltage"
     balance_opening_pressure_difference:
-      name: "balance opening pressure difference"
+      name: "${jk1_name} balance opening pressure difference"
     power_tube_temperature_protection:
       id: power_tube_temperature_protection
-      name: "power tube temperature protection"
+      name: "${jk1_name} power tube temperature protection"
     power_tube_temperature_recovery:
       id: power_tube_temperature_recovery
-      name: "power tube temperature recovery"
+      name: "${jk1_name} power tube temperature recovery"
     temperature_sensor_temperature_protection:
       id: temperature_sensor_temperature_protection
-      name: "temperature sensor temperature protection"
+      name: "${jk1_name} temperature sensor temperature protection"
     temperature_sensor_temperature_recovery:
       id: temperature_sensor_temperature_recovery
-      name: "temperature sensor temperature recovery"
+      name: "${jk1_name} temperature sensor temperature recovery"
     temperature_sensor_temperature_difference_protection:
-      name: "temperature sensor temperature difference protection"
+      name: "${jk1_name} temperature sensor temperature difference protection"
     charging_high_temperature_protection:
       id: charging_high_temperature_protection
-      name: "charging high temperature protection"
+      name: "${jk1_name} charging high temperature protection"
     discharging_high_temperature_protection:
       id: discharging_high_temperature_protection
-      name: "discharging high temperature protection"
+      name: "${jk1_name} discharging high temperature protection"
     charging_low_temperature_protection:
       id: charging_low_temperature_protection
-      name: "charging low temperature protection"
+      name: "${jk1_name} charging low temperature protection"
     charging_low_temperature_recovery:
       id: charging_low_temperature_recovery
-      name: "charging low temperature recovery"
+      name: "${jk1_name} charging low temperature recovery"
     discharging_low_temperature_protection:
       id: discharging_low_temperature_protection
-      name: "discharging low temperature protection"
+      name: "${jk1_name} discharging low temperature protection"
     discharging_low_temperature_recovery:
       id: discharging_low_temperature_recovery
-      name: "discharging low temperature recovery"
+      name: "${jk1_name} discharging low temperature recovery"
     total_battery_capacity_setting:
-      name: "total battery capacity setting"
+      name: "${jk1_name} total battery capacity setting"
     current_calibration:
-      name: "current calibration"
+      name: "${jk1_name} current calibration"
     device_address:
-      name: "device address"
+      name: "${jk1_name} device address"
     sleep_wait_time:
-      name: "sleep wait time"
+      name: "${jk1_name} sleep wait time"
     alarm_low_volume:
-      name: "alarm low volume"
+      name: "${jk1_name} alarm low volume"
     manufacturing_date:
-      name: "manufacturing date"
+      name: "${jk1_name} manufacturing date"
     total_runtime:
-      name: "total runtime"
+      name: "${jk1_name} total runtime"
 #    start_current_calibration:
-#      name: "start current calibration"
+#      name: "${jk1_name} start current calibration"
     actual_battery_capacity:
-      name: "actual battery capacity"
+      name: "${jk1_name} actual battery capacity"
 #    protocol_version:
-#      name: "protocol version"
+#      name: "${jk1_name} protocol version"
 # Uptime sensor
   - platform: uptime
     name: Uptime Sensor
@@ -903,21 +896,21 @@ sensor:
 text_sensor:
   - platform: jk_bms
     errors:
-      name: "errors"
+      name: "${jk1_name} errors"
     operation_mode:
-      name: "operation mode"
+      name: "${jk1_name} operation mode"
     battery_type:
-      name: "battery type"
+      name: "${jk1_name} battery type"
     password:
-      name: "password"
+      name: "${jk1_name} password"
     device_type:
-      name: "device type"
+      name: "${jk1_name} device type"
     software_version:
-      name: "software version"
+      name: "${jk1_name} software version"
     manufacturer:
-      name: "manufacturer"
+      name: "${jk1_name} manufacturer"
     total_runtime_formatted:
-      name: "total runtime formatted"
+      name: "${jk1_name} total runtime formatted"
 # Template text sensors
   - platform: template
     name: Uptime Human Readable

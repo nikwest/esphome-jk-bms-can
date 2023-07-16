@@ -16,6 +16,7 @@ substitutions:
 # --------------------------
 # prefix name that will appear in esphome and homeassistant for JK BMS entitys.
   jk1_name: jk1
+
 # prefix name that will appear in esphome and homeassistant for Deye Inverter entitys.
   deye_name: Deye
   
@@ -1086,6 +1087,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
+    skip_updates: 10
     name: "${deye_name} Daily Production"
     id: sun12k_Daily_Production
     register_type: holding
@@ -1100,11 +1102,11 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
+    skip_updates: 10
     name: "${deye_name} Total PV Production"
     id: sun12k_Total_PV_Production
     register_type: holding
     address: 534
-    skip_updates: 10
     unit_of_measurement: "kWh"
     state_class: "total_increasing"
     device_class: energy
@@ -1202,10 +1204,10 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 10
-    name: "${deye_name} active power generation of today"
-    id: sun12k_active_power_generation_of_today
+    name: "${deye_name} power generation of today"
+    id: sun12k_power_generation_of_today
     register_type: holding
-    address: 502
+    address: 501
     unit_of_measurement: "kWh"
     state_class: "total_increasing"
     device_class: energy
@@ -1299,53 +1301,53 @@ sensor:
     value_type: U_WORD  
 
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: "${deye_name} Internal CT L1 Power"
-    id: sun12k_Internal_CT_L1_Power
-    register_type: holding
-    address: 604
-    unit_of_measurement: "W"
-    state_class: "measurement"
-    accuracy_decimals: 0
-    value_type: S_WORD  
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: "${deye_name} Internal CT L1 Power"
+  #   id: sun12k_Internal_CT_L1_Power
+  #   register_type: holding
+  #   address: 604
+  #   unit_of_measurement: "W"
+  #   state_class: "measurement"
+  #   accuracy_decimals: 0
+  #   value_type: S_WORD  
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: "${deye_name} Internal CT L2 Power"
-    id: sun12k_Internal_CT_L2_Power
-    register_type: holding
-    address: 605
-    unit_of_measurement: "W"
-    state_class: "measurement"
-    accuracy_decimals: 0
-    value_type: S_WORD  
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: "${deye_name} Internal CT L2 Power"
+  #   id: sun12k_Internal_CT_L2_Power
+  #   register_type: holding
+  #   address: 605
+  #   unit_of_measurement: "W"
+  #   state_class: "measurement"
+  #   accuracy_decimals: 0
+  #   value_type: S_WORD  
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: "${deye_name} Internal CT L3 Power"
-    id: sun12k_Internal_CT_L3_Power
-    register_type: holding
-    address: 606
-    unit_of_measurement: "W"
-    state_class: "measurement"
-    accuracy_decimals: 0
-    value_type: S_WORD  
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: "${deye_name} Internal CT L3 Power"
+  #   id: sun12k_Internal_CT_L3_Power
+  #   register_type: holding
+  #   address: 606
+  #   unit_of_measurement: "W"
+  #   state_class: "measurement"
+  #   accuracy_decimals: 0
+  #   value_type: S_WORD  
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: "${deye_name} Internal total Power" 
-    id: sun12k_Internal_total_Power
-    register_type: holding
-    address: 607
-    unit_of_measurement: "W"
-    state_class: "measurement"
-    accuracy_decimals: 0
-    value_type: S_WORD   
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: "${deye_name} Internal total Power" 
+  #   id: sun12k_Internal_total_Power
+  #   register_type: holding
+  #   address: 607
+  #   unit_of_measurement: "W"
+  #   state_class: "measurement"
+  #   accuracy_decimals: 0
+  #   value_type: S_WORD   
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
@@ -1385,8 +1387,8 @@ sensor:
  
   - platform: modbus_controller  
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Out-of-grid–total power"
-    id: sun12k_out_of_grid_total_power
+    name: "${deye_name} Grid total power"
+    id: sun12k_grid_total_power
     register_type: holding
     address: 619
     unit_of_measurement: "W"
@@ -1396,8 +1398,8 @@ sensor:
     
   - platform: modbus_controller # Load totalpower
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Load totalpower" 
-    id: sun12k_Load_totalpower
+    name: "${deye_name} Load total power" 
+    id: sun12k_load_totalpower
     register_type: holding
     address: 653
     unit_of_measurement: "W"
@@ -1407,7 +1409,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    skip_updates: 10
     name: "${deye_name} Warning1"
     id:  sun12k_Warning1
     register_type: holding
@@ -1417,7 +1419,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    skip_updates: 10
     name: "${deye_name} Warning2"
     id:  sun12k_Warning2
     register_type: holding
@@ -1427,7 +1429,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    skip_updates: 10
     name: "${deye_name} Warning3"
     id:  sun12k_Warning3
     register_type: holding
@@ -1437,7 +1439,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    skip_updates: 10
     name: "${deye_name} Error1"
     id:  sun12k_Error1
     register_type: holding
@@ -1447,7 +1449,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    skip_updates: 10
     name: "${deye_name} Error2"
     id:  sun12k_Error2
     register_type: holding
@@ -1457,7 +1459,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    skip_updates: 10
     name: "${deye_name} Error3"
     id:  sun12k_Error3
     register_type: holding
@@ -1478,7 +1480,7 @@ sensor:
   # Battery
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 5
+    skip_updates: 60
     name: "${deye_name} Total charge of the battery"
     id:  sun12k_battery_total_charge
     register_type: holding
@@ -1493,7 +1495,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 5
+    skip_updates: 60
     name: "${deye_name} Total discharge of the battery"
     id:  sun12k_battery_total_discharge
     register_type: holding
@@ -1688,224 +1690,275 @@ number:
     restore_value: true
 
   # Modbus to DEYE Inverter
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Maximum_battery_charge_current
-    name: "${deye_name} Maximum battery charge current"
-    address: 108
-    unit_of_measurement: A
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Maximum_battery_charge_current
+  #   name: "${deye_name} Maximum battery charge current"
+  #   unit_of_measurement: A
+  #   address: 108
+  #   min_value: 0
+  #   max_value: 240
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Maximum_battery_discharge_current
-    name: "${deye_name} Maximum battery discharge current"
-    address: 109
-    unit_of_measurement: A
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Maximum_battery_discharge_current
+  #   name: "${deye_name} Maximum battery discharge current"
+  #   unit_of_measurement: A
+  #   address: 109
+  #   min_value: 0
+  #   max_value: 240
+  #   step: 1
+  #   value_type: U_WORD
 
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Maximum_battery_grid_charge_current
-    name: "${deye_name} Maximum battery_grid charge current"
-    address: 128
-    unit_of_measurement: A
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Maximum_battery_grid_charge_current
+  #   name: "${deye_name} Maximum battery_grid charge current"
+  #   unit_of_measurement: A
+  #   address: 128
+  #   min_value: 0
+  #   max_value: 240
+  #   step: 1
+  #   value_type: U_WORD
 
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_max_solar_sell_power
-    name: "${deye_name} Max Solar Sell Power"
-    unit_of_measurement: W
-    address: 143
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_max_solar_sell_power
+  #   name: "${deye_name} Max Solar Sell Power"
+  #   unit_of_measurement: W
+  #   address: 143
+  #   min_value: 0
+  #   max_value: 12000
+  #   step: 1
+  #   value_type: U_WORD
 
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_1
-    name: "${deye_name} Time point 1 start"
-    address: 148
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_1
+  #   name: "${deye_name} Time point 1 start"
+  #   address: 148
+  #   min_value: 0
+  #   max_value: 2359
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_2
-    name: "${deye_name} Time point 2 start"
-    address: 149
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_2
+  #   name: "${deye_name} Time point 2 start"
+  #   address: 149
+  #   min_value: 0
+  #   max_value: 2359
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_3
-    name: "${deye_name} Time point 3 start"
-    address: 150
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_3
+  #   name: "${deye_name} Time point 3 start"
+  #   address: 150
+  #   min_value: 0
+  #   max_value: 2359
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_4
-    name: "${deye_name} Time point 4 start"
-    address: 151
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_4
+  #   name: "${deye_name} Time point 4 start"
+  #   address: 151
+  #   min_value: 0
+  #   max_value: 2359
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_5
-    name: "${deye_name} Time point 5 start"
-    address: 152
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_5
+  #   name: "${deye_name} Time point 5 start"
+  #   address: 152
+  #   min_value: 0
+  #   max_value: 2359
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_6
-    name: "${deye_name} Time point 6 start"
-    address: 153
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_6
+  #   name: "${deye_name} Time point 6 start"
+  #   address: 153
+  #   min_value: 0
+  #   max_value: 2359
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_1_power
-    name: "${deye_name} Time point 1 power"
-    unit_of_measurement: W
-    address: 154
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_1_power
+  #   name: "${deye_name} Time point 1 power"
+  #   unit_of_measurement: W
+  #   address: 154
+  #   min_value: 0
+  #   max_value: 12000
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_2_power
-    name: "${deye_name} Time point 2 power"
-    unit_of_measurement: W
-    address: 155
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_2_power
+  #   name: "${deye_name} Time point 2 power"
+  #   unit_of_measurement: W
+  #   address: 155
+  #   min_value: 0
+  #   max_value: 12000
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_3_power
-    name: "${deye_name} Time point 3 power"
-    unit_of_measurement: W
-    address: 156
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_3_power
+  #   name: "${deye_name} Time point 3 power"
+  #   unit_of_measurement: W
+  #   address: 156
+  #   min_value: 0
+  #   max_value: 12000
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_4_power
-    name: "${deye_name} Time point 4 power"
-    unit_of_measurement: W
-    address: 157
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_4_power
+  #   name: "${deye_name} Time point 4 power"
+  #   unit_of_measurement: W
+  #   address: 157
+  #   min_value: 0
+  #   max_value: 12000
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_5_power
-    name: "${deye_name} Time point 5 power"
-    unit_of_measurement: W
-    address: 158
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_5_power
+  #   name: "${deye_name} Time point 5 power"
+  #   unit_of_measurement: W
+  #   address: 158
+  #   min_value: 0
+  #   max_value: 12000
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_6_power
-    name: "${deye_name} Time point 6 power"
-    unit_of_measurement: W
-    address: 159
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_6_power
+  #   name: "${deye_name} Time point 6 power"
+  #   unit_of_measurement: W
+  #   address: 159
+  #   min_value: 0
+  #   max_value: 12000
+  #   step: 1
+  #   value_type: U_WORD
 
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_1_capacity
-    name: "${deye_name} Time point 1 capacity"
-    unit_of_measurement: "%"
-    address: 166
-    min_value: 0
-    max_value: 100
-    step: 5
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_1_capacity
+  #   name: "${deye_name} Time point 1 capacity"
+  #   unit_of_measurement: "%"
+  #   address: 166
+  #   min_value: 0
+  #   max_value: 100
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_2_capacity
-    name: "${deye_name} Time point 2 capacity"
-    unit_of_measurement: "%"
-    address: 167
-    min_value: 0
-    max_value: 100
-    step: 5
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_2_capacity
+  #   name: "${deye_name} Time point 2 capacity"
+  #   unit_of_measurement: "%"
+  #   address: 167
+  #   min_value: 0
+  #   max_value: 100
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_3_capacity
-    name: "${deye_name} Time point 3 capacity"
-    unit_of_measurement: "%"
-    address: 168
-    min_value: 0
-    max_value: 100
-    step: 5
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_3_capacity
+  #   name: "${deye_name} Time point 3 capacity"
+  #   unit_of_measurement: "%"
+  #   address: 168
+  #   min_value: 0
+  #   max_value: 100
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_4_capacity
-    name: "${deye_name} Time point 4 capacity"
-    unit_of_measurement: "%"
-    address: 169
-    min_value: 0
-    max_value: 100
-    step: 5
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_4_capacity
+  #   name: "${deye_name} Time point 4 capacity"
+  #   unit_of_measurement: "%"
+  #   address: 169
+  #   min_value: 0
+  #   max_value: 100
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_5_capacity
-    name: "${deye_name} Time point 5 capacity"
-    unit_of_measurement: "%"
-    address: 170
-    min_value: 0
-    max_value: 100
-    step: 5
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_5_capacity
+  #   name: "${deye_name} Time point 5 capacity"
+  #   unit_of_measurement: "%"
+  #   address: 170
+  #   min_value: 0
+  #   max_value: 100
+  #   step: 1
+  #   value_type: U_WORD
     
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_Time_point_6_capacity
-    name: "${deye_name} Time point 6 capacity"
-    unit_of_measurement: "%"
-    address: 171
-    min_value: 0
-    max_value: 100
-    step: 5
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_Time_point_6_capacity
+  #   name: "${deye_name} Time point 6 capacity"
+  #   unit_of_measurement: "%"
+  #   address: 171
+  #   min_value: 0
+  #   max_value: 100
+  #   step: 1
+  #   value_type: U_WORD
 
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    id: sun12k_max_solar_power
-    name: "${deye_name} Max Solar Power"
-    unit_of_measurement: W
-    address: 340
-    value_type: U_WORD
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   id: sun12k_max_solar_power
+  #   name: "${deye_name} Max Solar Sell Power"
+  #   unit_of_measurement: W
+  #   address: 340
+  #   min_value: 0
+  #   max_value: 15600
+  #   step: 1
+  #   value_type: U_WORD
 
 script:
   - id: absorption_script
@@ -1940,85 +1993,94 @@ switch:
   - platform: modbus_controller
     use_write_multiple: true
     modbus_controller_id: modbus_deye
-    name: ${deye_name} Solar sell
+    name: ${deye_name} Battery Type Lithium
     register_type: holding
-    address: 145
+    address: 98
     bitmask: 1
     entity_category: config
     icon: "mdi:toggle-switch"
-  - platform: modbus_controller
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Grid Charge
-    register_type: holding
-    address: 130
-    bitmask: 1
-    entity_category: config
-    icon: "mdi:toggle-switch"
-  - platform: modbus_controller  # Advanced peak shaving and valley filling function enabled
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Time of Use 
-    id: sun12k_Time_of_Use
-    register_type: holding
-    address: 146
-    bitmask: 1
-    entity_category: config
-    icon: "mdi:toggle-switch"
-  - platform: modbus_controller  # Time point 1 charge enable - grid charging enable
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Time point 1 charge enable
-    register_type: holding
-    address: 172
-    bitmask: 1   # 2 hvis man ønsker Gen charging enabel i sted for.
-    entity_category: config
-    icon: "mdi:toggle-switch"
-  - platform: modbus_controller  # Time point 2 charge enable - grid charging enable
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Time point 2 charge enable
-    register_type: holding
-    address: 173
-    bitmask: 1    # 2 hvis man ønsker Gen charging enabel i sted for.
-    entity_category: config
-    icon: "mdi:toggle-switch"
-  - platform: modbus_controller  # Time point 3 charge enable - grid charging enable
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Time point 3 charge enable
-    register_type: holding
-    address: 174
-    bitmask: 1    # 2 hvis man ønsker Gen charging enabel i sted for.
-    entity_category: config
-    icon: "mdi:toggle-switch"
-  - platform: modbus_controller  # Time point 4 charge enable - grid charging enable
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Time point 4 charge enable
-    register_type: holding
-    address: 175
-    bitmask: 1
-    entity_category: config
-    icon: "mdi:toggle-switch"
-  - platform: modbus_controller  # Time point 5 charge enable - grid charging enable
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Time point 5 charge enable
-    register_type: holding
-    address: 176
-    bitmask: 1
-    entity_category: config
-    icon: "mdi:toggle-switch"
-  - platform: modbus_controller  # Time point 6 charge enable - grid charging enable
-    use_write_multiple: true
-    modbus_controller_id: modbus_deye
-    name: ${deye_name} Time point 6 charge enable
-    register_type: holding
-    address: 177
-    bitmask: 1
-    entity_category: config
-    icon: "mdi:toggle-switch"
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Solar sell
+  #   register_type: holding
+  #   address: 145
+  #   bitmask: 1
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Grid Charge
+  #   register_type: holding
+  #   address: 130
+  #   bitmask: 1
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller  # Advanced peak shaving and valley filling function enabled
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Time of Use 
+  #   id: sun12k_Time_of_Use
+  #   register_type: holding
+  #   address: 146
+  #   bitmask: 1
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller  # Time point 1 enable grid or gen charge
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Time point 1 charge enable
+  #   register_type: holding
+  #   address: 172
+  #   bitmask: 1   # 1 = grid charging enable 2 = gen charging enable
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller  # Time point 2 enable grid or gen charge
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Time point 2 charge enable
+  #   register_type: holding
+  #   address: 173
+  #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller  # Time point 3 enable grid or gen charge
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Time point 3 charge enable
+  #   register_type: holding
+  #   address: 174
+  #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller  # Time point 4 enable grid or gen charge
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Time point 4 charge enable
+  #   register_type: holding
+  #   address: 175
+  #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller  # Time point 5 enable grid or gen charge
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Time point 5 charge enable
+  #   register_type: holding
+  #   address: 176
+  #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
+  # - platform: modbus_controller  # Time point 6 enable grid or gen charge
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Time point 6 charge enable
+  #   register_type: holding
+  #   address: 177
+  #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
+  #   entity_category: config
+  #   icon: "mdi:toggle-switch"
  
  
 select:
@@ -2031,14 +2093,23 @@ select:
     optionsmap:
       "Battery first": 0
       "Load first": 1
-
+  # - platform: modbus_controller
+  #   use_write_multiple: true
+  #   modbus_controller_id: modbus_deye
+  #   name: ${deye_name} Limit control mode
+  #   address: 142
+  #   value_type: U_WORD
+  #   optionsmap:
+  #     "Selling first": 0
+  #     "Zero export to load": 1
+  #     "Zero export to CT": 2
   - platform: modbus_controller
     use_write_multiple: true
     modbus_controller_id: modbus_deye
-    name: ${deye_name} Limit control mode
-    address: 142
+    name: ${deye_name} Battery control mode
+    address: 111
     value_type: U_WORD
     optionsmap:
-      "Selling first": 0
-      "Zero export to load": 1
-      "Zero export to CT": 2
+      "Use Battery V": 0
+      "Use Battery %": 1
+      "No Battery": 2
