@@ -386,13 +386,13 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
 
   // 00 00 00 00 68 00 00 54 D1: End of frame
 
-  if (get_top_balancing_enabled() != this->balancing_switch_binary_sensor_->state) {
+  /*if (get_top_balancing_enabled() != this->balancing_switch_binary_sensor_->state) {
     if (get_top_balancing_enabled()) {
       sendBalancingOn();
     } else {
       sendBalancingOff();
     }
-  }
+  }*/
   
   set_states_updated(true);
   
