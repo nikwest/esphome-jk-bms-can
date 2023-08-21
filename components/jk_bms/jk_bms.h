@@ -243,7 +243,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   void set_top_balancing_enabled(bool top_balancing_enabled) { top_balancing_enabled_ = top_balancing_enabled; }
 
-  bool get_top_balancing_enabled(return top_balancing_enabled_)
+  bool get_top_balancing_enabled(return top_balancing_enabled_; )
 
   void dump_config() override;
 
