@@ -241,6 +241,10 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   
   bool get_states_updated() {return states_updated_; }
 
+  void set_top_balancing_enabled(bool top_balancing_enabled) { top_balancing_enabled_ = top_balancing_enabled; }
+
+  bool get_top_balancing_enabled(return top_balancing_enabled_)
+
   void dump_config() override;
 
   void on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t> &data) override;
@@ -334,7 +338,10 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   bool enable_fake_traffic_;
   bool states_updated_ = false;
+  bool top_balancing_enabled_ = true;
 
+  void sendBalancingOn();
+  void sendBalancingOff();
   void on_status_data_(const std::vector<uint8_t> &data);
   void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
   void publish_state_(sensor::Sensor *sensor, float value);
