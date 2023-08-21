@@ -63,7 +63,7 @@ void JkBms::sendBalancingOn() {
   this->send(WRITE_REGISTER, 0x9D, 0x01);
 }
 
-void JkModbus::sendBalancingOff() {
+void JkBms::sendBalancingOff() {
   this->send(WRITE_REGISTER, 0x9D, 0x00);
 }
 
