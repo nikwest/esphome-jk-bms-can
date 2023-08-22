@@ -46,7 +46,7 @@ static const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
 
 bool sendOtherFake = false;
 
-static const uint8_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 30; 
+static const uint8_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 300;
 
 uint8_t publish_all_states_counter = 0;
 
