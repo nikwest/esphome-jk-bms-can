@@ -114,7 +114,7 @@ void JkModbus::send(uint8_t function, uint8_t address, uint8_t value) {
   frame[6] = 0x00;      // bms terminal number
   frame[7] = 0x00;      // bms terminal number
   frame[8] = function;  // command word: 0x01 (activation), 0x02 (write), 0x03 (read), 0x05 (password), 0x06 (read all)
-  frame[9] = 0x00;      // frame source: 0x00 (bms), 0x01 (bluetooth), 0x02 (gps), 0x03 (computer)
+  frame[9] = 0x02;      // frame source: 0x00 (bms), 0x01 (bluetooth), 0x02 (gps), 0x03 (computer)
   frame[10] = 0x02;     // frame type: 0x00 (read data), 0x01 (reply frame), 0x02 (BMS active upload)
   frame[11] = address;  // register: 0x00 (read all registers), 0x8E...0xBF (holding registers)
   frame[12] = value;    // data

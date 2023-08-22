@@ -59,16 +59,6 @@ void JkBms::on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t
   ESP_LOGW(TAG, "Invalid size (%zu) for JK BMS frame!", data.size());
 }
 
-void JkBms::sendBalancingOn() {
-  this->send(WRITE_REGISTER, 0x9D, 0x01);
-  ESP_LOGW(TAG, "Send Balancing On");
-}
-
-void JkBms::sendBalancingOff() {
-  this->send(WRITE_REGISTER, 0x9D, 0x00);
-  ESP_LOGW(TAG, "Send Balancing Off");
-}
-
 void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   auto jk_get_16bit = [&](size_t i) -> uint16_t { return (uint16_t(data[i + 0]) << 8) | (uint16_t(data[i + 1]) << 0); };
   auto jk_get_32bit = [&](size_t i) -> uint32_t {
@@ -388,14 +378,6 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
 
   // 00 00 00 00 68 00 00 54 D1: End of frame
 
-  if (get_top_balancing_enabled() != this->balancing_switch_binary_sensor_->state) {
-    if (get_top_balancing_enabled()) {
-      sendBalancingOn();
-    } else {
-      sendBalancingOff();
-    }
-  }
-  
   set_states_updated(true);
   
   if(publish_all_states_counter++ >= RESET_PUBLISH_ALL_STATES_COUNTER_EVERY) {

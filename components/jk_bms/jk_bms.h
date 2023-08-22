@@ -340,8 +340,6 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   bool states_updated_ = false;
   bool top_balancing_enabled_ = true;
 
-  void sendBalancingOn();
-  void sendBalancingOff();
   void on_status_data_(const std::vector<uint8_t> &data);
   void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
   void publish_state_(sensor::Sensor *sensor, float value);
