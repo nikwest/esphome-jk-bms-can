@@ -61,10 +61,12 @@ void JkBms::on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t
 
 void JkBms::sendBalancingOn() {
   this->send(WRITE_REGISTER, 0x9D, 0x01);
+  ESP_LOGW(TAG, "Send Balancing On");
 }
 
 void JkBms::sendBalancingOff() {
   this->send(WRITE_REGISTER, 0x9D, 0x00);
+  ESP_LOGW(TAG, "Send Balancing Off");
 }
 
 void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
