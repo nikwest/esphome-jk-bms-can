@@ -46,7 +46,7 @@ static const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
 
 bool sendOtherFake = false;
 
-static const uint8_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 300;
+static const uint16_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 300;
 
 uint8_t publish_all_states_counter = 0;
 
@@ -386,13 +386,13 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
 
   // 00 00 00 00 68 00 00 54 D1: End of frame
 
-  /*if (get_top_balancing_enabled() != this->balancing_switch_binary_sensor_->state) {
+  if (get_top_balancing_enabled() != this->balancing_switch_binary_sensor_->state) {
     if (get_top_balancing_enabled()) {
       sendBalancingOn();
     } else {
       sendBalancingOff();
     }
-  }*/
+  }
   
   set_states_updated(true);
   
