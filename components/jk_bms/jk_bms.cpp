@@ -48,7 +48,7 @@ bool sendOtherFake = false;
 
 static const uint16_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 300;
 
-uint8_t publish_all_states_counter = 0;
+uint16_t publish_all_states_counter = 0;
 
 void JkBms::on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t> &data) {
   if (function == FUNCTION_READ_ALL) {
