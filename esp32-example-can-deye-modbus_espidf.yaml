@@ -33,22 +33,16 @@ substitutions:
 # the minimum the charge current can be reduced to, if a limit caluclates a lower value charging will be set to 0 (off)
   min_charge_a: "2"
 
-# Absorption Voltage for Constant Voltage charging(CV). This is Absorption voltage you want the inverter to charge with 3.45v per cell. Value will be multiplied by cells reported from the BMS. 
-  cell_absorption_v: "3.45"
+# Balance Voltage for Constant Voltage charging(CV). This is the balance voltage you want the inverter to charge with 3.45v per cell. Value will be multiplied by cells reported from the BMS. 
+  balance_v: "55.3"
 
-  cell_absorption_v_slider_min: "3.3" # min value for GUI slider, recommended LiFePo4 = 3.3, LiIon = 3.8
-  cell_absorption_v_slider_max: "3.6" # max value for GUI slider, recommended LiFePo4 = 3.6, LiIon = 4.2
+  balance_v_slider_min: "52.8" # (3.3 * 16 cells = 52.8) min value for GUI slider, recommended LiFePo4 = 3.3, LiIon = 3.8
+  balance_v_slider_max: "58.4"  # (3.65 * 16 cells = 58.4) max value for GUI slider, recommended LiFePo4 = 3.6, LiIon = 4.2
 
-# Absorption time in minutes to hold charge voltage after charge voltage is reached eg 10
+# Absorption time in seconds to hold charge voltage after charge voltage is reached eg 120 seconds
 # timer will be reset if balance voltage is not reached yet when balance voltage is set higher than absorption voltage
 # and will also be reset when balancing is active
-  absorption_time: "10"
-
-# Rebulk offset, x Volts below absorption volatge battery will request rebulk, eg 55.2-3 = 52.5v, roughly 90% SOC.
-  cell_rebulk_v: "3.35"
-
-  cell_rebulk_v_slider_min: "3.2" # min value for GUI slider, recommended LiFePo4 = 3.2, LiIon = 4.0
-  cell_rebulk_v_slider_max: "3.5" # max value for GUI slider, recommended LiFePo4 = 3.5, LiIon = 4.18
+  absorption_time: "120"
 
 # --------------------------------------
 # Battery Discharge setting:
@@ -60,10 +54,10 @@ substitutions:
   min_discharge_a: "2"
 
 # Minimum discharge voltage eg 48v/16 = 3V per cell
-  cell_min_dischange_v: "3.0"
+  min_dischange_v: "48"
 
-  cell_min_dischange_v_slider_min: "2.5" # min value for GUI slider, recommended LiFePo4 = 2.5, LiIon = 2.5
-  cell_min_dischange_v_slider_max: "3.2" # min value for GUI slider, recommended LiFePo4 = 3.2, LiIon = 3.5
+  min_dischange_v_slider_min: "40"   # (2.5 * 16 cells = 40)   min value for GUI slider, recommended LiFePo4 = 2.5, LiIon = 2.5
+  min_dischange_v_slider_max: "51.2" # (3.2 * 16 cells = 51.2) min value for GUI slider, recommended LiFePo4 = 3.2, LiIon = 3.5
 
 # --------------------------------------
 # Battery State of Health (SOH) setting:
@@ -73,22 +67,22 @@ substitutions:
 # --------------------------------------
 # Aditional wire ntc temperature sensor which is connected directly to the ESP.
 # Will start to reduce current at temperature_wire_recovery and set current to 0 at temperature_wire_protection.
-  use_wire_temperature_sensor: "true"
+  use_wire_temperature_sensor: "false"
   temperature_wire_recovery: "80.0"
   temperature_wire_protection: "100.0"
 
 # --------------------------------------
 # ESP32 CAN/Serail port pins:
 # GPIO pins your CAN bus transceiver(TJA1050) is connected to the ESP, note! TX->TX and RX->RX. 
-  can_tx_pin: GPIO5 # GPIO23
-  can_rx_pin: GPIO3 # GPIO22
+  can_tx_pin: GPIO7 # GPIO23
+  can_rx_pin: GPIO9 # GPIO22
 # GPIO pins your JK-BMS RS485(TTL) is connected to the ESP TX->RX and RX->TX. 
   tx_pin: GPIO18 # GPIO17
   rx_pin: GPIO16 # GPIO16
 
 # GPIO pins your Modbus controller is connected to the ESP, note! TX->TX and RX->RX. 
-  modbus_tx_pin: GPIO33
-  modbus_rx_pin: GPIO35
+  modbus_tx_pin: GPIO11
+  modbus_rx_pin: GPIO12
 
 # --------------------------------------
 #### Don't make changes below this ####
@@ -139,6 +133,10 @@ globals:
   - id: no_uart_update_counter
     type: int
     restore_value: no
+    initial_value: '0'
+  - id: next_top_balance_value
+    type: int
+    restore_value: yes
     initial_value: '0'
   - id: can_bms_name_update_counter
     type: int
@@ -195,14 +193,14 @@ api:
 
 output:
   - platform: gpio
-    pin: 2
+    pin: 15 # 2
     id: led
-    inverted: true
+    inverted: false
 
 light:
   - platform: binary
     output: led
-    id: led_buitin
+    id: led_builtin
     name: "${jk1_name} Builtin LED"
     internal: true
 
@@ -228,7 +226,7 @@ modbus_controller:
     address: 0x1
     modbus_id: modbus1
     setup_priority: -10
-    update_interval: 15sec
+    update_interval: 5s
 
 jk_modbus:
   id: modbus0
@@ -249,7 +247,7 @@ canbus:
     - can_id: 0x305 # SMA/LG/Pylon/Goodwe reply   PYLON_CAN_NETWORK_ALIVE_MSG_FRAME_ID        
       then:
         - light.toggle:
-            id: led_buitin
+            id: led_builtin
         - lambda: |-
             // ESP_LOGI("main", "received can id: 0x305 ACK");
             id(can_305_rx) = 0;
@@ -276,7 +274,7 @@ interval:
                 if (id(uart_missing_error)) id(uart_missing_error) = false;
                 id(no_uart_update_counter) = 0;
                 id(bms0).set_states_updated(false);
-                return true;
+                return false; // TODO only deactivated because deye is missing, activate again
               } else if (id(no_uart_update_counter)++ >= 50) { // 500 is 500x10ms = 5000ms = 5s
                 id(uart_missing_error) = true;
                 id(no_uart_update_counter) = 40;
@@ -331,51 +329,37 @@ interval:
                 can_id: 0x351 # Battery voltage + current limits
                 data: !lambda |-
                   uint8_t can_mesg[7];
+
                   if (  !id(charging_switch).state
-                      | !id(inverter_charging).state)
+                      || !id(inverter_charging).state) 
                   {
                     id(charge_status) = "Disabled";
-
-                  } else if (id(inverter_chg_on).state) {
-                    id(charge_status) = "Bulk Manually";
-
-                  } else if (   id(charging_switch).state
-                             && id(inverter_charging).state
-                             && id(charge_status) == "Disabled")
-                  {
-                    id(charge_status) = "Wait";
-
-                  } else if (  !id(inverter_chg_on).state
-                             && id(charge_status) == "Bulk Manually")
-                  {
-                    id(charge_status) = "Wait";
-
-                  } else if (id(total_voltage).state <= (id(cell_idle_voltage).state * id(cells).state)) { // Bulk Charge eg 53.6v 10% 
-                    if (id(absorption_script).is_running()) id(absorption_script).stop();
-                    id(charge_status) = "Bulk";
-
-                  } else if (   id(total_voltage).state > id(cell_idle_voltage).state * id(cells).state
-                             && id(total_voltage).state < (id(cell_absorption_voltage).state * id(cells).state) - 0.05) // If in startup rebulk
-                  {
-                    if (id(charge_status) == "Startup") {
-                      id(charge_status) = "Bulk"; // If in startup, 10% low rebulk
+                    
+                  } else if (id(inverter_top_balance).state) {
+                    if (id(charge_status) != "Top Balancing") {
+                      id(charge_status) = "Top Balancing";
+                      id(balancing_script).execute();
+                    }
+                    if (   id(max_cell_voltage).state < id(balance_starting_voltage).state       // max cell is still below balance_starting_voltage
+                        || id(balancing).state                                                   // or balancing is active
+                        || id(current).state > 5) // reset script timer if balancing is active  // or current above 10 amps
+                    {
+                      if (id(balancing_script).is_running()) id(balancing_script).stop();             // then reset absorption script
+                      id(balancing_script).execute();
                     }
 
-                  } else if (id(total_voltage).state >= (id(cell_absorption_voltage).state * id(cells).state)  - 0.05) { // 10 % from top start absorption timer
-                    if (id(charge_status) == "Bulk") {
-                      id(charge_status) = "Absorption";
-                      if (!id(absorption_script).is_running()) id(absorption_script).execute();
-                    }
-
-                  } else if (   id(charge_status) == "Absorption"                                        // when in absorption
-                             && id(cell_absorption_voltage).state > id(balance_starting_voltage).state   // and absorption voltage is set higher than balance_starting_voltage
-                             && (   id(max_cell_voltage).state < id(balance_starting_voltage).state       // and (   max cell is still below balance_starting_voltage
-                                 || id(balancing).state)) // reset script timer if balancing is active    //      or balancing is active)
-                  { 
-                    if (id(absorption_script).is_running()) id(absorption_script).stop();             // then reset absorption script
-                    id(absorption_script).execute();
                   } else {
-                    id(charge_status) = "Wait";
+                    id(charge_status) = "Charge to %";
+                  }
+
+                  if (   id(balancing_script).is_running()
+                      && id(charge_status) != "Top Balancing") {
+                    id(balancing_script).stop();
+                  }
+
+                  if (   !id(balancing_script).is_running()
+                      && !id(trigger_timer_for_next_balancing_script).is_running()) {
+                    id(trigger_timer_for_next_balancing_script).execute();
                   }
                   
                   // # set esphome "charging_current" to match with max bms "charging_overcurrent_protection"
@@ -470,31 +454,48 @@ interval:
                   
                   setRampups(1.0f);
 
-                  float charge_volt = id(cell_idle_voltage).state * id(cells).state;
+                  float charge_volt = id(balance_voltage).state;
                   float charge_amp = 0;
-                  float discharge_volt = id(cell_min_dischange_voltage).state * id(cells).state;
+                  float discharge_volt = id(min_dischange_voltage).state;
                   float discharge_amp = 0;
                   
                   if (id(uart_missing_error)) {
                     id(charge_status) = "Disabled";
                   } else {
                     if (!id(charging_switch).state || !id(inverter_charging).state) { // Overides to disable charging
-                      //charge_volt = id(cell_idle_voltage).state * id(cells).state;
-                      //charge_amp = 0;
-                    } else if (id(charge_status) == "Bulk" || id(charge_status) == "Absorption" || id(inverter_chg_on).state) {
-                      charge_volt = id(cell_absorption_voltage).state * id(cells).state;
-                      charge_amp = limitedChargeCurrent;
+                      // charge_volt = id(balance_voltage).state;
+                      // charge_amp = 0;
+                    } else if (id(charge_status) == "Charge to %" || id(charge_status) == "Top Balancing") {
+
+                      charge_volt = id(balance_voltage).state;
+                      
+                      if (id(capacity_remaining).state < id(max_charge_percent).state) {
+                        charge_amp = limitedChargeCurrent;
+                      } else if (id(capacity_remaining).state > id(max_charge_percent).state){
+                        // charge_amp = 0;
+                      } else { // capacity_remaining == max_charge_percent
+                        if (id(send_inverter_charge_current).state > 0) {
+                          charge_amp = limitedChargeCurrent;
+                        } else {
+                          // charge_amp = 0;
+                        }
+                      }
                     } else {
-                      //charge_volt = id(cell_idle_voltage).state * id(cells).state;
-                      //charge_amp = 0;
+                      // charge_volt = id(balance_voltage).state;
+                      // charge_amp = 0;
                     }
                     
                     if (id(discharging_switch).state && id(inverter_discharging).state) {
                       discharge_amp = limitedDischargeCurrent;
+
+                      // only discharge till min_discharge_percent
+                      if (id(capacity_remaining).state <= id(min_discharge_percent).state) {
+                        discharge_amp = 0;
+                      }
                     } else {
-                      //discharge_amp = 0;
+                      // discharge_amp = 0;
                     }
-                    //discharge_volt = id(cell_min_dischange_voltage).state * id(cells).state;
+                    // discharge_volt = id(min_dischange_voltage).state;
                   }
 
                   can_mesg[0] = uint16_t(charge_volt * 10) & 0xff;
@@ -506,17 +507,19 @@ interval:
                   can_mesg[6] = uint16_t(discharge_volt * 10) & 0xff;
                   can_mesg[7] = uint16_t(discharge_volt * 10) >> 8 & 0xff;
                   
-                  id(send_inverter_charge_voltage).publish_state(uint16_t(charge_volt * 10) / 10.0);
-                  id(send_inverter_charge_current).publish_state(uint16_t(charge_amp * 10) / 10.0);
-                  id(send_inverter_discharge_current).publish_state(uint16_t(discharge_amp * 10) / 10.0);
-                  id(send_inverter_discharge_voltage).publish_state(uint16_t(discharge_volt * 10) / 10.0);
+                  if (id(send_inverter_charge_voltage).state    != uint16_t(charge_volt * 10) / 10.0)    id(send_inverter_charge_voltage).publish_state(uint16_t(charge_volt * 10) / 10.0);
+                  if (id(send_inverter_charge_current).state    != uint16_t(charge_amp * 10) / 10.0)     id(send_inverter_charge_current).publish_state(uint16_t(charge_amp * 10) / 10.0);
+                  if (id(send_inverter_discharge_current).state != uint16_t(discharge_amp * 10) / 10.0)  id(send_inverter_discharge_current).publish_state(uint16_t(discharge_amp * 10) / 10.0);
+                  if (id(send_inverter_discharge_voltage).state != uint16_t(discharge_volt * 10) / 10.0) id(send_inverter_discharge_voltage).publish_state(uint16_t(discharge_volt * 10) / 10.0);
 
                   if (id(limited_charge_current_reason).state != limitedChargeCurrentReason) id(limited_charge_current_reason).publish_state(limitedChargeCurrentReason);
                   if (id(limited_discharge_current_reason).state != limitedDischargeCurrentReason) id(limited_discharge_current_reason).publish_state(limitedDischargeCurrentReason);
 
-                  id(charging_status).publish_state(id(charge_status));
+                  if (id(charging_status).state != id(charge_status)) {
+                    id(charging_status).publish_state(id(charge_status));
+                  }
 
-                  ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(cell_min_dischange_voltage).state * id(cells).state * 10) / 10.0f);
+                  ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(min_dischange_voltage).state * 10) / 10.0f);
 
                   ESP_LOGI("main", "send can id: 0x351 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
                   ESP_LOGI("main", "send can id: Charge Status %s", id(charge_status).c_str());
@@ -627,9 +630,9 @@ interval:
                   - delay: 10ms
                   - canbus.send:
                       can_id: 0x35E # Manufacturer name ("GOODWE")
-                      data: [0x47, 0x4F, 0x4F, 0x44, 0x57, 0x45, 0x20, 0x20] # "GOODWE"
+                      #data: [0x47, 0x4F, 0x4F, 0x44, 0x57, 0x45, 0x20, 0x20] # "GOODWE"
                       #data: [0x50, 0x59, 0x4C, 0x4F, 0x4E, 0x20, 0x20, 0x20] # "PYLON"
-                      #data: [0X4A, 0X4B, 0x20, 0x42, 0x4D, 0x53, 0x20, 0x20] # "JK BMS"
+                      data: [0X4A, 0X4B, 0x20, 0x42, 0x4D, 0x53, 0x20, 0x20] # "JK BMS"
 
 binary_sensor:
   - platform: jk_bms
@@ -652,50 +655,50 @@ binary_sensor:
       name: "${jk1_name} dedicated charger switch"
   
   # Modbus to DEYE Inverter
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: ${deye_name} AC INV relay # bit 0
-    id: sun12k_AC_INV_relay
-    register_type: holding
-    address: 552
-    bitmask: 0x1
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: ${deye_name} AC INV relay # bit 0
+  #   id: sun12k_AC_INV_relay
+  #   register_type: holding
+  #   address: 552
+  #   bitmask: 0x1
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: ${deye_name} AC Load relay Reserved # bit 1
-    id: sun12k_AC_Load_relay_Reserved
-    register_type: holding
-    address: 552
-    bitmask: 0x2
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: ${deye_name} AC Load relay Reserved # bit 1
+  #   id: sun12k_AC_Load_relay_Reserved
+  #   register_type: holding
+  #   address: 552
+  #   bitmask: 0x2
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: ${deye_name} AC grid relay # bit 2
-    id: sun12k_AC_grid_relay
-    register_type: holding
-    address: 552
-    bitmask: 0x4
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: ${deye_name} AC grid relay # bit 2
+  #   id: sun12k_AC_grid_relay
+  #   register_type: holding
+  #   address: 552
+  #   bitmask: 0x4
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: ${deye_name} AC Generator relay # bit 3
-    id: sun12k_AC_Generator_relay
-    register_type: holding
-    address: 552
-    bitmask: 0x8
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: ${deye_name} AC Generator relay # bit 3
+  #   id: sun12k_AC_Generator_relay
+  #   register_type: holding
+  #   address: 552
+  #   bitmask: 0x8
  
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 2
-    name: ${deye_name} Turn off/on status
-    id: sun12k_Turn_off_on_status
-    register_type: holding
-    address: 551
-    bitmask: 0x1
+  # - platform: modbus_controller
+  #   modbus_controller_id: modbus_deye
+  #   skip_updates: 2
+  #   name: ${deye_name} Turn off/on status
+  #   id: sun12k_Turn_off_on_status
+  #   register_type: holding
+  #   address: 551
+  #   bitmask: 0x1
 
 sensor:
   # NTC Aditional BMS Wire Temperature Sensor
@@ -944,6 +947,25 @@ sensor:
                 (minutes ? to_string(minutes) + "m " : "") +
                 (to_string(seconds) + "s")
               ).c_str();
+        - text_sensor.template.publish:
+            id: next_top_balance
+            state: !lambda |-
+              int seconds = fmax(0, id(next_top_balance_value) - round(id(uptime_sensor).raw_state));
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              seconds = seconds % 60;
+              return (
+                (days ? to_string(days) + "d " : "") +
+                (hours ? to_string(hours) + "h " : "") +
+                (minutes ? to_string(minutes) + "m " : "") +
+                (to_string(seconds) + "s")
+              ).c_str();
+
+        
+
   - platform: template
     name: "Send inverter charge voltage"
     id: send_inverter_charge_voltage
@@ -1087,7 +1109,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Daily Production"
     id: sun12k_Daily_Production
     register_type: holding
@@ -1102,7 +1124,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Total PV Production"
     id: sun12k_Total_PV_Production
     register_type: holding
@@ -1128,7 +1150,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Daily Energy Bought"
     id: sun12k_Daily_Energy_Bought
     register_type: holding
@@ -1143,7 +1165,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Daily Energy Sold"
     id: sun12k_Daily_Energy_Sold
     register_type: holding
@@ -1158,7 +1180,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Total Energy Bought"
     id: sun12k_Total_Energy_Bought
     register_type: holding
@@ -1173,7 +1195,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Total Energy Sold"
     id: sun12k_Total_Energy_Sold
     register_type: holding
@@ -1188,7 +1210,7 @@ sensor:
  
   - platform: modbus_controller #Total Consumption
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Total Consumption"
     id: sun12k_Total_Consumption
     register_type: holding
@@ -1203,7 +1225,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} power generation of today"
     id: sun12k_power_generation_of_today
     register_type: holding
@@ -1351,7 +1373,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     name: "${deye_name} External CT L1 Power"
     id: sun12k_External_CT_L1_Power
     register_type: holding
@@ -1363,7 +1385,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     name: "${deye_name} External CT L2 Power"
     id: sun12k_External_CT_L2_Power
     register_type: holding
@@ -1375,7 +1397,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     name: "${deye_name} External CT L3 Power"
     id: sun12k_External_CT_L3_Power
     register_type: holding
@@ -1409,7 +1431,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Warning1"
     id:  sun12k_Warning1
     register_type: holding
@@ -1419,7 +1441,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Warning2"
     id:  sun12k_Warning2
     register_type: holding
@@ -1429,7 +1451,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Warning3"
     id:  sun12k_Warning3
     register_type: holding
@@ -1439,7 +1461,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Error1"
     id:  sun12k_Error1
     register_type: holding
@@ -1449,7 +1471,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Error2"
     id:  sun12k_Error2
     register_type: holding
@@ -1459,7 +1481,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 10
+    skip_updates: 6
     name: "${deye_name} Error3"
     id:  sun12k_Error3
     register_type: holding
@@ -1536,7 +1558,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     name: "${deye_name} battery capacity"
     id: sun12k_battery_capacity
     register_type: holding
@@ -1594,6 +1616,10 @@ text_sensor:
     id: uptime_human
     icon: mdi:clock-start
   - platform: template
+    name: Next Top Balance
+    id: next_top_balance
+    icon: mdi:clock-start
+  - platform: template
     name: "Charging Status"
     id: charging_status
   - platform: template
@@ -1606,7 +1632,7 @@ text_sensor:
   # Modbus to DEYE Inverter
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     id: sun12k_Running_Status
     bitmask: 0
     register_type: holding
@@ -1629,37 +1655,25 @@ text_sensor:
 # Slider
 number:
   - platform: template
-    name: "Cell absorption voltage"
-    id: "cell_absorption_voltage"
-    step: 0.01
-    min_value: "${cell_absorption_v_slider_min}"
-    max_value: "${cell_absorption_v_slider_max}"
+    name: "Balance voltage"
+    id: "balance_voltage"
+    step: 0.1
+    min_value: "${balance_v_slider_min}"
+    max_value: "${balance_v_slider_max}"
     mode: slider
-    initial_value: "${cell_absorption_v}"
+    initial_value: "${balance_v}"
     unit_of_measurement: V
     icon: mdi:battery-charging
     optimistic: true
     restore_value: true
   - platform: template
-    name: "Cell idle voltage"
-    id: "cell_idle_voltage"
-    step: 0.01
-    min_value: "${cell_rebulk_v_slider_min}"
-    max_value: "${cell_rebulk_v_slider_max}"
+    name: "Min discharge voltage"
+    id: "min_dischange_voltage"
+    step: 0.1
+    min_value: "${min_dischange_v_slider_min}"
+    max_value: "${min_dischange_v_slider_max}"
     mode: slider
-    initial_value: "${cell_rebulk_v}"
-    unit_of_measurement: V
-    icon: mdi:battery-charging
-    optimistic: true
-    restore_value: true
-  - platform: template
-    name: "Cell min discharge voltage"
-    id: "cell_min_dischange_voltage"
-    step: 0.01
-    min_value: "${cell_min_dischange_v_slider_min}"
-    max_value: "${cell_min_dischange_v_slider_max}"
-    mode: slider
-    initial_value: "${cell_min_dischange_v}"
+    initial_value: "${min_dischange_v}"
     unit_of_measurement: V
     icon: mdi:battery-charging
     optimistic: true
@@ -1688,7 +1702,50 @@ number:
     icon: mdi:current-dc
     optimistic: true
     restore_value: true
+  - platform: template
+    name: "Max Charge %"
+    id: "max_charge_percent"
+    step: 1
+    min_value: 10
+    max_value: 100
+    mode: slider
+    initial_value: 90
+    unit_of_measurement: "%"
+    icon: mdi:battery-arrow-up
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: "Min Discharge %"
+    id: "min_discharge_percent"
+    step: 1
+    min_value: 1
+    max_value: 90
+    mode: slider
+    initial_value: 20
+    unit_of_measurement: "%"
+    icon: mdi:battery-arrow-down-outline
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: "Days between balancing"
+    id: "days_between_balancing"
+    step: 1
+    min_value: 0
+    max_value: 30
+    mode: slider
+    initial_value: 1
+    unit_of_measurement: "days"
+    icon: mdi:calendar-today
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          if (id(trigger_timer_for_next_balancing_script).is_running()) {
+            id(trigger_timer_for_next_balancing_script).stop();
+            id(trigger_timer_for_next_balancing_script).execute();
+          }
 
+  
   # Modbus to DEYE Inverter
   # - platform: modbus_controller
   #   use_write_multiple: true
@@ -1961,11 +2018,26 @@ number:
   #   value_type: U_WORD
 
 script:
-  - id: absorption_script
+  - id: balancing_script
     then:
-      - lambda: id(charge_status) = "Absorption";
-      - delay: ${absorption_time}min
-      - lambda: id(charge_status) = "Wait";
+      - lambda: |-
+          if (id(trigger_timer_for_next_balancing_script).is_running()) id(trigger_timer_for_next_balancing_script).stop();
+          id(next_top_balance_value) = 0;
+      - delay: ${absorption_time}s
+      - lambda: |-
+          id(charge_status) = "Wait";
+          id(inverter_top_balance).publish_state(false);
+          id(trigger_timer_for_next_balancing_script).execute();
+  - id: trigger_timer_for_next_balancing_script
+    then:
+      - delay: 100ms
+      # int seconds = round(id(uptime_sensor).raw_state);
+      - delay: !lambda |-
+          float secondsToNextBalance = fmax(0, (id(days_between_balancing).state * 24 * 60 * 60) - (12 * 60 * 60)); // days - 12 hours
+          id(next_top_balance_value) = round(id(uptime_sensor).raw_state) + secondsToNextBalance;
+          return secondsToNextBalance * 1000;
+      - lambda: |-
+          id(inverter_top_balance).publish_state(true);
 
 switch:
   # NTC Aditional BMS Wire Temperature Sensor
@@ -1977,18 +2049,18 @@ switch:
     name: Charging enabled
     id: inverter_charging
     optimistic: true
-    restore_state: true
+    restore_mode: RESTORE_DEFAULT_ON # restore_state: true
   - platform: template
     name: Discharge enabled
     id: inverter_discharging
     optimistic: true
-    restore_state: true
+    restore_mode: RESTORE_DEFAULT_ON # restore_state: true
   - platform: template
-    name: Charging manually (top bal)
-    id: inverter_chg_on
+    name: Charging top balance
+    id: inverter_top_balance
     optimistic: true
-    restore_state: true
-
+    restore_mode: ALWAYS_ON # restore_state: false
+  
   # Modbus to DEYE Inverter
   - platform: modbus_controller
     use_write_multiple: true
