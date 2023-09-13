@@ -81,10 +81,6 @@ substitutions:
   tx_pin: GPIO18 # GPIO17
   rx_pin: GPIO16 # GPIO16
 
-# GPIO pins your Modbus controller is connected to the ESP, note! TX->TX and RX->RX. 
-  modbus_tx_pin: GPIO33
-  modbus_rx_pin: GPIO35
-
 # --------------------------------------
 #### Don't make changes below this ####
   external_components_source: github://Ackmaniac/esphome-jk-bms-can@develop # TODO set to main
