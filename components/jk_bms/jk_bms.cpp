@@ -46,9 +46,9 @@ static const char *const BATTERY_TYPES[BATTERY_TYPES_SIZE] = {
 
 bool sendOtherFake = false;
 
-static const uint8_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 30; 
+static const uint16_t RESET_PUBLISH_ALL_STATES_COUNTER_EVERY = 300;
 
-uint8_t publish_all_states_counter = 0;
+uint16_t publish_all_states_counter = 0;
 
 void JkBms::on_jk_modbus_data(const uint8_t &function, const std::vector<uint8_t> &data) {
   if (function == FUNCTION_READ_ALL) {
@@ -377,7 +377,7 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
   this->publish_state_(this->protocol_version_sensor_, (float) data[offset + 84 + 3 * 45]);
 
   // 00 00 00 00 68 00 00 54 D1: End of frame
-  
+
   set_states_updated(true);
   
   if(publish_all_states_counter++ >= RESET_PUBLISH_ALL_STATES_COUNTER_EVERY) {
