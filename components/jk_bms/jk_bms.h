@@ -419,6 +419,11 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
     }
   };
 
+  float getLimitedChargeCurrent(return limitedChargeCurrent);
+  float getLimitedDischargeCurrent(return limitedDischargeCurrent);
+  char* getLimitedChargeCurrentReason(return limitedChargeCurrentReason);
+  char* getLimitedDischargeCurrentReason(return limitedDischargeCurrentReason);
+
  protected:
   sensor::Sensor *min_cell_voltage_sensor_;
   sensor::Sensor *max_cell_voltage_sensor_;
