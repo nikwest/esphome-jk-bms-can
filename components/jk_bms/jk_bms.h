@@ -273,19 +273,19 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
     minCharge = initMinCharge;
     minDischarge = initMinDischarge;
-  };
+  }
   
   void limitAbsolutChargeCurrent(float maximum) {
     if (limitedChargeCurrent > maximum) {
         limitedChargeCurrent = maximum;  
     }
-  };
+  }
 
   void limitAbsolutDischargeCurrent(float maximum) {
     if (limitedDischargeCurrent > maximum) {
         limitedDischargeCurrent = maximum;  
     }
-  };
+  }
   
   void limitChargeCurrent(float val, float minimum, float maximum, float bufferFromMax, const char* limitText, bool byPowerOf) {
     if ((maximum > minimum && val > minimum)
@@ -319,11 +319,11 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
         chargeIsLimited = true;
       }
     }
-  };
+  }
   
   void limitChargeCurrent(float val, float minimum, float maximum, float bufferFromMax, const char* limitText) {
     limitChargeCurrent(val, minimum, maximum, bufferFromMax, limitText, false);
-  };
+  }
 
   void limitDischargeCurrent(float val, float minimum, float maximum, float bufferFromMax, const char* limitText, bool byPowerOf) {
     if ((maximum > minimum && val > minimum)
@@ -357,21 +357,21 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
         dischargeIsLimited = true;
       } 
     }
-  };
+  }
   
   void limitDischargeCurrent(float val, float minimum, float maximum, float bufferFromMax, const char* limitText) {
     limitDischargeCurrent(val, minimum, maximum, bufferFromMax, limitText, false);
-  };
+  }
 
   void limitChargeAndDischargeCurrent(float val, float minimum, float maximum, float bufferFromMax, const char* limitText, bool byPowerOf) {
     limitChargeCurrent(val, minimum, maximum, bufferFromMax, limitText, byPowerOf);
     limitDischargeCurrent(val, minimum, maximum, bufferFromMax, limitText, byPowerOf);
-  };
+  }
   
   void limitChargeAndDischargeCurrent(float val, float minimum, float maximum, float bufferFromMax, const char* limitText) {
     limitChargeCurrent(val, minimum, maximum, bufferFromMax, limitText, false);
     limitDischargeCurrent(val, minimum, maximum, bufferFromMax, limitText, false);
-  };
+  }
   
   void setRampups(float step) {
     // CHARGING
@@ -417,12 +417,15 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
     } else {
       rampUpLimitedDischargeCurrent = limitedDischargeCurrent;
     }
-  };
+  }
 
-  float getLimitedChargeCurrent(return limitedChargeCurrent;);
-  float getLimitedDischargeCurrent(return limitedDischargeCurrent;);
-  char* getLimitedChargeCurrentReason(return limitedChargeCurrentReason;);
-  char* getLimitedDischargeCurrentReason(return limitedDischargeCurrentReason;);
+  float getLimitedChargeCurrent() {return limitedChargeCurrent;}
+
+  float getLimitedDischargeCurrent() {return limitedDischargeCurrent;}
+
+  char* getLimitedChargeCurrentReason() {return limitedChargeCurrentReason;}
+
+  char* getLimitedDischargeCurrentReason() {return limitedDischargeCurrentReason;}
 
  protected:
   sensor::Sensor *min_cell_voltage_sensor_;
