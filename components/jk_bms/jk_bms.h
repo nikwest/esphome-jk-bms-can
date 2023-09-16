@@ -251,151 +251,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   void update() override;
 
- protected:
-  sensor::Sensor *min_cell_voltage_sensor_;
-  sensor::Sensor *max_cell_voltage_sensor_;
-  sensor::Sensor *min_voltage_cell_sensor_;
-  sensor::Sensor *max_voltage_cell_sensor_;
-  sensor::Sensor *delta_cell_voltage_sensor_;
-  sensor::Sensor *average_cell_voltage_sensor_;
-  sensor::Sensor *cells_sensor_;
-  sensor::Sensor *power_tube_temperature_sensor_;
-  sensor::Sensor *temperature_sensor_1_sensor_;
-  sensor::Sensor *temperature_sensor_2_sensor_;
-  sensor::Sensor *total_voltage_sensor_;
-  sensor::Sensor *current_sensor_;
-  sensor::Sensor *power_sensor_;
-  sensor::Sensor *charging_power_sensor_;
-  sensor::Sensor *discharging_power_sensor_;
-  sensor::Sensor *capacity_remaining_sensor_;
-  sensor::Sensor *capacity_remaining_derived_sensor_;
-  sensor::Sensor *temperature_sensors_sensor_;
-  sensor::Sensor *charging_cycles_sensor_;
-  sensor::Sensor *total_charging_cycle_capacity_sensor_;
-  sensor::Sensor *battery_strings_sensor_;
-  sensor::Sensor *errors_bitmask_sensor_;
-  sensor::Sensor *operation_mode_bitmask_sensor_;
-  sensor::Sensor *total_voltage_overvoltage_protection_sensor_;
-  sensor::Sensor *total_voltage_undervoltage_protection_sensor_;
-  sensor::Sensor *cell_voltage_overvoltage_protection_sensor_;
-  sensor::Sensor *cell_voltage_overvoltage_recovery_sensor_;
-  sensor::Sensor *cell_voltage_overvoltage_delay_sensor_;
-  sensor::Sensor *cell_voltage_undervoltage_protection_sensor_;
-  sensor::Sensor *cell_voltage_undervoltage_recovery_sensor_;
-  sensor::Sensor *cell_voltage_undervoltage_delay_sensor_;
-  sensor::Sensor *cell_pressure_difference_protection_sensor_;
-  sensor::Sensor *discharging_overcurrent_protection_sensor_;
-  sensor::Sensor *discharging_overcurrent_delay_sensor_;
-  sensor::Sensor *charging_overcurrent_protection_sensor_;
-  sensor::Sensor *charging_overcurrent_delay_sensor_;
-  sensor::Sensor *balance_starting_voltage_sensor_;
-  sensor::Sensor *balance_opening_pressure_difference_sensor_;
-  sensor::Sensor *power_tube_temperature_protection_sensor_;
-  sensor::Sensor *power_tube_temperature_recovery_sensor_;
-  sensor::Sensor *temperature_sensor_temperature_protection_sensor_;
-  sensor::Sensor *temperature_sensor_temperature_recovery_sensor_;
-  sensor::Sensor *temperature_sensor_temperature_difference_protection_sensor_;
-  sensor::Sensor *charging_high_temperature_protection_sensor_;
-  sensor::Sensor *discharging_high_temperature_protection_sensor_;
-  sensor::Sensor *charging_low_temperature_protection_sensor_;
-  sensor::Sensor *charging_low_temperature_recovery_sensor_;
-  sensor::Sensor *discharging_low_temperature_protection_sensor_;
-  sensor::Sensor *discharging_low_temperature_recovery_sensor_;
-  sensor::Sensor *total_battery_capacity_setting_sensor_;
-  sensor::Sensor *charging_sensor_;
-  sensor::Sensor *discharging_sensor_;
-  sensor::Sensor *current_calibration_sensor_;
-  sensor::Sensor *device_address_sensor_;
-  sensor::Sensor *sleep_wait_time_sensor_;
-  sensor::Sensor *alarm_low_volume_sensor_;
-  sensor::Sensor *password_sensor_;
-  sensor::Sensor *manufacturing_date_sensor_;
-  sensor::Sensor *total_runtime_sensor_;
-  sensor::Sensor *start_current_calibration_sensor_;
-  sensor::Sensor *actual_battery_capacity_sensor_;
-  sensor::Sensor *protocol_version_sensor_;
-
-  binary_sensor::BinarySensor *balancing_binary_sensor_;
-  binary_sensor::BinarySensor *balancing_switch_binary_sensor_;
-  binary_sensor::BinarySensor *charging_binary_sensor_;
-  binary_sensor::BinarySensor *charging_switch_binary_sensor_;
-  binary_sensor::BinarySensor *discharging_binary_sensor_;
-  binary_sensor::BinarySensor *discharging_switch_binary_sensor_;
-  binary_sensor::BinarySensor *dedicated_charger_switch_binary_sensor_;
-
-  text_sensor::TextSensor *errors_text_sensor_;
-  text_sensor::TextSensor *operation_mode_text_sensor_;
-  text_sensor::TextSensor *battery_type_text_sensor_;
-  text_sensor::TextSensor *password_text_sensor_;
-  text_sensor::TextSensor *device_type_text_sensor_;
-  text_sensor::TextSensor *software_version_text_sensor_;
-  text_sensor::TextSensor *manufacturer_text_sensor_;
-  text_sensor::TextSensor *total_runtime_formatted_text_sensor_;
-
-  struct Cell {
-    sensor::Sensor *cell_voltage_sensor_{nullptr};
-  } cells_[24];
-
-  bool enable_fake_traffic_;
-  bool states_updated_ = false;
-  bool top_balancing_enabled_ = true;
-
-  float chargeCurrent = 0;
-  float dischargeCurrent = 0;
-
-  float limitedChargeCurrent = 0;
-  float limitedDischargeCurrent = 0;
-
-  char limitedChargeCurrentReason[200];
-  char limitedDischargeCurrentReason[200];
-    
-  float rampUpLimitedChargeCurrent = -1;
-  float rampUpLimitedDischargeCurrent = -1;
-
-  bool chargeIsLimited = false;
-  bool dischargeIsLimited = false;
-
-  float minCharge;
-  float minDischarge;
-
-  void on_status_data_(const std::vector<uint8_t> &data);
-  void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
-  void publish_state_(sensor::Sensor *sensor, float value);
-  void publish_state_(text_sensor::TextSensor *text_sensor, const std::string &state);
-
-  std::string error_bits_to_string_(uint16_t bitmask);
-  std::string mode_bits_to_string_(uint16_t bitmask);
-
-  float get_temperature_(const uint16_t value) {
-    if (value > 100)
-      return (float) (100 - (int16_t) value);
-
-    return (float) value;
-  };
-
-  float get_current_(const uint16_t value, const uint8_t protocol_version) {
-    float current = 0.0f;
-    if (protocol_version == 0x01) {
-      if ((value & 0x8000) == 0x8000) {
-        current = (float) (value & 0x7FFF);
-      } else {
-        current = (float) (value & 0x7FFF) * -1;
-      }
-    }
-
-    return current;
-  };
-
-  std::string format_total_runtime_(const uint32_t value) {
-    int seconds = (int) value;
-    int years = seconds / (24 * 3600 * 365);
-    seconds = seconds % (24 * 3600 * 365);
-    int days = seconds / (24 * 3600);
-    seconds = seconds % (24 * 3600);
-    int hours = seconds / 3600;
-    return (years ? to_string(years) + "y " : "") + (days ? to_string(days) + "d " : "") +
-           (hours ? to_string(hours) + "h" : "");
-  };
+  // protection calculation
 
   void initValues(float initChargeCurrent, float initDischargeCurrent, float initMinCharge, float initMinDischarge ) {
     chargeCurrent = initChargeCurrent;
@@ -561,6 +417,152 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
     } else {
       rampUpLimitedDischargeCurrent = limitedDischargeCurrent;
     }
+  };
+
+ protected:
+  sensor::Sensor *min_cell_voltage_sensor_;
+  sensor::Sensor *max_cell_voltage_sensor_;
+  sensor::Sensor *min_voltage_cell_sensor_;
+  sensor::Sensor *max_voltage_cell_sensor_;
+  sensor::Sensor *delta_cell_voltage_sensor_;
+  sensor::Sensor *average_cell_voltage_sensor_;
+  sensor::Sensor *cells_sensor_;
+  sensor::Sensor *power_tube_temperature_sensor_;
+  sensor::Sensor *temperature_sensor_1_sensor_;
+  sensor::Sensor *temperature_sensor_2_sensor_;
+  sensor::Sensor *total_voltage_sensor_;
+  sensor::Sensor *current_sensor_;
+  sensor::Sensor *power_sensor_;
+  sensor::Sensor *charging_power_sensor_;
+  sensor::Sensor *discharging_power_sensor_;
+  sensor::Sensor *capacity_remaining_sensor_;
+  sensor::Sensor *capacity_remaining_derived_sensor_;
+  sensor::Sensor *temperature_sensors_sensor_;
+  sensor::Sensor *charging_cycles_sensor_;
+  sensor::Sensor *total_charging_cycle_capacity_sensor_;
+  sensor::Sensor *battery_strings_sensor_;
+  sensor::Sensor *errors_bitmask_sensor_;
+  sensor::Sensor *operation_mode_bitmask_sensor_;
+  sensor::Sensor *total_voltage_overvoltage_protection_sensor_;
+  sensor::Sensor *total_voltage_undervoltage_protection_sensor_;
+  sensor::Sensor *cell_voltage_overvoltage_protection_sensor_;
+  sensor::Sensor *cell_voltage_overvoltage_recovery_sensor_;
+  sensor::Sensor *cell_voltage_overvoltage_delay_sensor_;
+  sensor::Sensor *cell_voltage_undervoltage_protection_sensor_;
+  sensor::Sensor *cell_voltage_undervoltage_recovery_sensor_;
+  sensor::Sensor *cell_voltage_undervoltage_delay_sensor_;
+  sensor::Sensor *cell_pressure_difference_protection_sensor_;
+  sensor::Sensor *discharging_overcurrent_protection_sensor_;
+  sensor::Sensor *discharging_overcurrent_delay_sensor_;
+  sensor::Sensor *charging_overcurrent_protection_sensor_;
+  sensor::Sensor *charging_overcurrent_delay_sensor_;
+  sensor::Sensor *balance_starting_voltage_sensor_;
+  sensor::Sensor *balance_opening_pressure_difference_sensor_;
+  sensor::Sensor *power_tube_temperature_protection_sensor_;
+  sensor::Sensor *power_tube_temperature_recovery_sensor_;
+  sensor::Sensor *temperature_sensor_temperature_protection_sensor_;
+  sensor::Sensor *temperature_sensor_temperature_recovery_sensor_;
+  sensor::Sensor *temperature_sensor_temperature_difference_protection_sensor_;
+  sensor::Sensor *charging_high_temperature_protection_sensor_;
+  sensor::Sensor *discharging_high_temperature_protection_sensor_;
+  sensor::Sensor *charging_low_temperature_protection_sensor_;
+  sensor::Sensor *charging_low_temperature_recovery_sensor_;
+  sensor::Sensor *discharging_low_temperature_protection_sensor_;
+  sensor::Sensor *discharging_low_temperature_recovery_sensor_;
+  sensor::Sensor *total_battery_capacity_setting_sensor_;
+  sensor::Sensor *charging_sensor_;
+  sensor::Sensor *discharging_sensor_;
+  sensor::Sensor *current_calibration_sensor_;
+  sensor::Sensor *device_address_sensor_;
+  sensor::Sensor *sleep_wait_time_sensor_;
+  sensor::Sensor *alarm_low_volume_sensor_;
+  sensor::Sensor *password_sensor_;
+  sensor::Sensor *manufacturing_date_sensor_;
+  sensor::Sensor *total_runtime_sensor_;
+  sensor::Sensor *start_current_calibration_sensor_;
+  sensor::Sensor *actual_battery_capacity_sensor_;
+  sensor::Sensor *protocol_version_sensor_;
+
+  binary_sensor::BinarySensor *balancing_binary_sensor_;
+  binary_sensor::BinarySensor *balancing_switch_binary_sensor_;
+  binary_sensor::BinarySensor *charging_binary_sensor_;
+  binary_sensor::BinarySensor *charging_switch_binary_sensor_;
+  binary_sensor::BinarySensor *discharging_binary_sensor_;
+  binary_sensor::BinarySensor *discharging_switch_binary_sensor_;
+  binary_sensor::BinarySensor *dedicated_charger_switch_binary_sensor_;
+
+  text_sensor::TextSensor *errors_text_sensor_;
+  text_sensor::TextSensor *operation_mode_text_sensor_;
+  text_sensor::TextSensor *battery_type_text_sensor_;
+  text_sensor::TextSensor *password_text_sensor_;
+  text_sensor::TextSensor *device_type_text_sensor_;
+  text_sensor::TextSensor *software_version_text_sensor_;
+  text_sensor::TextSensor *manufacturer_text_sensor_;
+  text_sensor::TextSensor *total_runtime_formatted_text_sensor_;
+
+  struct Cell {
+    sensor::Sensor *cell_voltage_sensor_{nullptr};
+  } cells_[24];
+
+  bool enable_fake_traffic_;
+  bool states_updated_ = false;
+  bool top_balancing_enabled_ = true;
+
+  float chargeCurrent = 0;
+  float dischargeCurrent = 0;
+
+  float limitedChargeCurrent = 0;
+  float limitedDischargeCurrent = 0;
+
+  char limitedChargeCurrentReason[200];
+  char limitedDischargeCurrentReason[200];
+    
+  float rampUpLimitedChargeCurrent = -1;
+  float rampUpLimitedDischargeCurrent = -1;
+
+  bool chargeIsLimited = false;
+  bool dischargeIsLimited = false;
+
+  float minCharge;
+  float minDischarge;
+
+  void on_status_data_(const std::vector<uint8_t> &data);
+  void publish_state_(binary_sensor::BinarySensor *binary_sensor, const bool &state);
+  void publish_state_(sensor::Sensor *sensor, float value);
+  void publish_state_(text_sensor::TextSensor *text_sensor, const std::string &state);
+
+  std::string error_bits_to_string_(uint16_t bitmask);
+  std::string mode_bits_to_string_(uint16_t bitmask);
+
+  float get_temperature_(const uint16_t value) {
+    if (value > 100)
+      return (float) (100 - (int16_t) value);
+
+    return (float) value;
+  };
+
+  float get_current_(const uint16_t value, const uint8_t protocol_version) {
+    float current = 0.0f;
+    if (protocol_version == 0x01) {
+      if ((value & 0x8000) == 0x8000) {
+        current = (float) (value & 0x7FFF);
+      } else {
+        current = (float) (value & 0x7FFF) * -1;
+      }
+    }
+
+    return current;
+  };
+
+  std::string format_total_runtime_(const uint32_t value) {
+    int seconds = (int) value;
+    int years = seconds / (24 * 3600 * 365);
+    seconds = seconds % (24 * 3600 * 365);
+    int days = seconds / (24 * 3600);
+    seconds = seconds % (24 * 3600);
+    int hours = seconds / 3600;
+    return (years ? to_string(years) + "y " : "") + (days ? to_string(days) + "d " : "") +
+           (hours ? to_string(hours) + "h" : "");
   };
 };
 
