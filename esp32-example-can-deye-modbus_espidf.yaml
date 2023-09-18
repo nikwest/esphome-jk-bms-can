@@ -15,7 +15,7 @@
 substitutions:
 # --------------------------
 # prefix name that will appear in esphome and homeassistant for JK BMS entitys.
-  jk1_name: jk1
+  jk_name: JK
 
 # prefix name that will appear in esphome and homeassistant for Deye Inverter entitys.
   deye_name: Deye
@@ -92,16 +92,15 @@ substitutions:
   external_components_source: github://Ackmaniac/esphome-jk-bms-can@develop # TODO set to main
 
 esphome:
-  name: jk-deye-controller
-  includes:
-    - jk-bms-helper.h
+  name: hjdc          
+  friendly_name: HJDC # (H)ome Assistant - (J)K - (D)eye - (C)ontroller
   #on_boot:
   #  then:
   #    - switch.turn_on: inverter_charging
   #    - switch.turn_on: inverter_discharging
   platformio_options:
     upload_speed: 115200
-    board_build.f_cpu: 80000000L
+    board_build.f_cpu: 240000000L
     #board_build.mcu: esp32s2
     #board_build.extra_flags:
     #  - "-DARDUINO_USB_CDC_ON_BOOT=0"
@@ -168,7 +167,6 @@ globals:
 
 button:
   - platform: restart
-    name: "${jk1_name} Restart button"
     id: restart_button
     internal: true
 
@@ -217,7 +215,7 @@ light:
   - platform: binary
     output: led
     id: led_builtin
-    name: "${jk1_name} Builtin LED"
+    name: "${jk_name} Builtin LED"
     internal: true
 
 uart:
@@ -291,7 +289,7 @@ interval:
                 if (id(uart_missing_error)) id(uart_missing_error) = false;
                 id(no_uart_update_counter) = 0;
                 id(bms0).set_states_updated(false);
-                return true;
+                return false; // TODO
               } else if (id(no_uart_update_counter)++ >= 50) { // 500 is 500x10ms = 5000ms = 5s
                 id(uart_missing_error) = true;
                 id(no_uart_update_counter) = 40;
@@ -393,86 +391,86 @@ interval:
                   }
 
                   // # startCalculuation
-                  initValues(min(id(charging_overcurrent_protection).state * 0.975f, id(charging_current).state),
-                             min(id(discharging_overcurrent_protection).state * 0.975f, id(discharging_current).state),
-                             ${min_charge_a},
-                             ${min_discharge_a});
+                  id(bms0).initValues(min(id(charging_overcurrent_protection).state * 0.975f, id(charging_current).state),
+                                      min(id(discharging_overcurrent_protection).state * 0.975f, id(discharging_current).state),
+                                      ${min_charge_a},
+                                      ${min_discharge_a});
 
                   // # cell_voltage_overvoltage
-                  limitChargeCurrent(id(max_cell_voltage).state,
-                                     id(cell_voltage_overvoltage_recovery).state,
-                                     id(cell_voltage_overvoltage_protection).state,
-                                     0.1f,
-                                     "cell_voltage_overvoltage");
+                  id(bms0).limitChargeCurrent(id(max_cell_voltage).state,
+                                              id(cell_voltage_overvoltage_recovery).state,
+                                              id(cell_voltage_overvoltage_protection).state,
+                                              0.1f,
+                                              "cell_voltage_overvoltage");
 
                   // # cell_voltage_undervoltage
-                  limitChargeCurrent(id(min_cell_voltage).state,
-                                     id(cell_voltage_undervoltage_recovery).state,
-                                     id(cell_voltage_undervoltage_protection).state,
-                                     0.1f,
-                                     "cell_voltage_undervoltage");
+                  id(bms0).limitChargeCurrent(id(min_cell_voltage).state,
+                                              id(cell_voltage_undervoltage_recovery).state,
+                                              id(cell_voltage_undervoltage_protection).state,
+                                              0.1f,
+                                              "cell_voltage_undervoltage");
 
                   // # power_tube_temperature
-                  limitChargeAndDischargeCurrent(id(power_tube_temperature).state,
-                                                 id(power_tube_temperature_recovery).state,
-                                                 id(power_tube_temperature_protection).state,
-                                                 0.1f,
-                                                 "power_tube_temperature",
-                                                 true);
+                  id(bms0).limitChargeAndDischargeCurrent(id(power_tube_temperature).state,
+                                                          id(power_tube_temperature_recovery).state,
+                                                          id(power_tube_temperature_protection).state,
+                                                          0.1f,
+                                                          "power_tube_temperature",
+                                                          true);
 
                   float maxBatteryTemperature = max(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
 
                   // # battery_temperature_sensor_temperature
-                  limitChargeAndDischargeCurrent(maxBatteryTemperature,
-                                                 id(temperature_sensor_temperature_recovery).state,
-                                                 id(temperature_sensor_temperature_protection).state,
-                                                 0.1f,
-                                                 "battery_temperature_sensor_temperature",
-                                                 true);
+                  id(bms0).limitChargeAndDischargeCurrent(maxBatteryTemperature,
+                                                          id(temperature_sensor_temperature_recovery).state,
+                                                          id(temperature_sensor_temperature_protection).state,
+                                                          0.1f,
+                                                          "battery_temperature_sensor_temperature",
+                                                          true);
 
                   // # battery_charging_high_temperature
-                  limitChargeCurrent(maxBatteryTemperature,
-                                     id(charging_high_temperature_protection).state - 10.0,
-                                     id(charging_high_temperature_protection).state,
-                                     0.1f,
-                                     "battery_charging_high_temperature",
-                                     true);
+                  id(bms0).limitChargeCurrent(maxBatteryTemperature,
+                                              id(charging_high_temperature_protection).state - 10.0,
+                                              id(charging_high_temperature_protection).state,
+                                              0.1f,
+                                              "battery_charging_high_temperature",
+                                              true);
 
                   // # battery_discharging_high_temperature
-                  limitDischargeCurrent(maxBatteryTemperature,
-                                        id(discharging_high_temperature_protection).state - 10.0,
-                                        id(discharging_high_temperature_protection).state,
-                                        0.1f,
-                                        "battery_discharging_high_temperature",
-                                        true);
+                  id(bms0).limitDischargeCurrent(maxBatteryTemperature,
+                                                 id(discharging_high_temperature_protection).state - 10.0,
+                                                 id(discharging_high_temperature_protection).state,
+                                                 0.1f,
+                                                 "battery_discharging_high_temperature",
+                                                 true);
 
                   float minBatteryTemperature = min(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
 
                   // # battery_charging_low_temperature
-                  limitChargeCurrent(minBatteryTemperature,
-                                     id(charging_low_temperature_recovery).state,
-                                     id(charging_low_temperature_protection).state,
-                                     0.1f,
-                                     "battery_charging_low_temperature");
+                  id(bms0).limitChargeCurrent(minBatteryTemperature,
+                                              id(charging_low_temperature_recovery).state,
+                                              id(charging_low_temperature_protection).state,
+                                              0.1f,
+                                              "battery_charging_low_temperature");
 
                   // # battery_discharging_low_temperature
-                  limitDischargeCurrent(minBatteryTemperature,
-                                        id(discharging_low_temperature_recovery).state,
-                                        id(discharging_low_temperature_protection).state,
-                                        0.1f,
-                                        "battery_discharging_low_temperature");
+                  id(bms0).limitDischargeCurrent(minBatteryTemperature,
+                                                 id(discharging_low_temperature_recovery).state,
+                                                 id(discharging_low_temperature_protection).state,
+                                                 0.1f,
+                                                 "battery_discharging_low_temperature");
 
                   // # wire_temperature
                   if (${use_wire_temperature_sensor}) {
-                    limitChargeAndDischargeCurrent(id(temperature_wire).state,
-                                                   ${temperature_wire_recovery},
-                                                   ${temperature_wire_protection},
-                                                   0.0f,
-                                                   "wire_temperature",
-                                                   true);
+                    id(bms0).limitChargeAndDischargeCurrent(id(temperature_wire).state,
+                                                            ${temperature_wire_recovery},
+                                                            ${temperature_wire_protection},
+                                                            0.0f,
+                                                            "wire_temperature",
+                                                            true);
                   }
                   
-                  setRampups(1.0f);
+                  id(bms0).setRampups(1.0f);
 
                   float charge_volt = id(balance_voltage).state;
                   float charge_amp = 0;
@@ -518,10 +516,10 @@ interval:
                     }
 
                     if (id(chargingAllowed)) {
-                      charge_amp = limitedChargeCurrent;
+                      charge_amp = id(bms0).getLimitedChargeCurrent();
                     }
                     if (id(dischargingAllowed)) {
-                      discharge_amp = limitedDischargeCurrent;
+                      discharge_amp = id(bms0).getLimitedDischargeCurrent();
                     }
                   }
 
@@ -539,8 +537,8 @@ interval:
                   if (id(send_inverter_discharge_current).state != uint16_t(discharge_amp * 10) / 10.0)  id(send_inverter_discharge_current).publish_state(uint16_t(discharge_amp * 10) / 10.0);
                   if (id(send_inverter_discharge_voltage).state != uint16_t(discharge_volt * 10) / 10.0) id(send_inverter_discharge_voltage).publish_state(uint16_t(discharge_volt * 10) / 10.0);
 
-                  if (id(limited_charge_current_reason).state != limitedChargeCurrentReason) id(limited_charge_current_reason).publish_state(limitedChargeCurrentReason);
-                  if (id(limited_discharge_current_reason).state != limitedDischargeCurrentReason) id(limited_discharge_current_reason).publish_state(limitedDischargeCurrentReason);
+                  if (id(limited_charge_current_reason).state != id(bms0).getLimitedChargeCurrentReason()) id(limited_charge_current_reason).publish_state(id(bms0).getLimitedChargeCurrentReason());
+                  if (id(limited_discharge_current_reason).state != id(bms0).getLimitedDischargeCurrentReason()) id(limited_discharge_current_reason).publish_state(id(bms0).getLimitedDischargeCurrentReason());
 
                   if (id(charging_status).state != id(charge_status)) {
                     id(charging_status).publish_state(id(charge_status));
@@ -667,28 +665,28 @@ binary_sensor:
   - platform: jk_bms
     balancing:
       id: balancing
-      name: "${jk1_name} balancing"
+      name: "${jk_name} Balancing"
     balancing_switch:
-      name: "${jk1_name} balancing switch"
+      name: "${jk_name} Balancing Switch"
     charging:
-      name: "${jk1_name} charging"
+      name: "${jk_name} Charging"
     charging_switch:
       id: charging_switch
-      name: "${jk1_name} charging switch"
+      name: "${jk_name} Charging Switch"
     discharging:
-      name: "${jk1_name} discharging"
+      name: "${jk_name} Discharging"
     discharging_switch:
       id: discharging_switch
-      name: "${jk1_name} discharging switch"
+      name: "${jk_name} Discharging Switch"
     dedicated_charger_switch:
-      name: "${jk1_name} dedicated charger switch"
+      name: "${jk_name} Dedicated Charger Switch"
   
   # Modbus to DEYE Inverter
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
   #   skip_updates: 2
-  #   name: ${deye_name} AC INV relay # bit 0
-  #   id: sun12k_AC_INV_relay
+  #   name: "${deye_name} AC INV Relay" # bit 0
+  #   id: deye_AC_INV_relay
   #   register_type: holding
   #   address: 552
   #   bitmask: 0x1
@@ -696,8 +694,8 @@ binary_sensor:
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
   #   skip_updates: 2
-  #   name: ${deye_name} AC Load relay Reserved # bit 1
-  #   id: sun12k_AC_Load_relay_Reserved
+  #   name: "${deye_name} AC Load Relay Reserved" # bit 1
+  #   id: deye_AC_Load_relay_Reserved
   #   register_type: holding
   #   address: 552
   #   bitmask: 0x2
@@ -705,8 +703,8 @@ binary_sensor:
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
   #   skip_updates: 2
-  #   name: ${deye_name} AC grid relay # bit 2
-  #   id: sun12k_AC_grid_relay
+  #   name: "${deye_name} AC Grid Relay" # bit 2
+  #   id: deye_AC_grid_relay
   #   register_type: holding
   #   address: 552
   #   bitmask: 0x4
@@ -714,8 +712,8 @@ binary_sensor:
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
   #   skip_updates: 2
-  #   name: ${deye_name} AC Generator relay # bit 3
-  #   id: sun12k_AC_Generator_relay
+  #   name: "${deye_name} AC Generator Relay" # bit 3
+  #   id: deye_AC_Generator_relay
   #   register_type: holding
   #   address: 552
   #   bitmask: 0x8
@@ -723,8 +721,8 @@ binary_sensor:
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
   #   skip_updates: 2
-  #   name: ${deye_name} Turn off/on status
-  #   id: sun12k_Turn_off_on_status
+  #   name: "${deye_name} Turn Off/On Status"
+  #   id: deye_Turn_off_on_status
   #   register_type: holding
   #   address: 551
   #   bitmask: 0x1
@@ -744,7 +742,7 @@ sensor:
   - platform: ntc
     id: temperature_wire
     sensor: resistance_sensor
-    name: "${jk1_name} temperature wire"
+    name: "${jk_name} Temperature Wire"
     calibration:
       b_constant: 3950
       reference_temperature: 25°C
@@ -758,204 +756,204 @@ sensor:
   - platform: jk_bms
     min_cell_voltage:
       id: min_cell_voltage
-      name: "${jk1_name} min cell voltage"
+      name: "${jk_name} Min Cell Voltage"
     max_cell_voltage:
       id: max_cell_voltage
-      name: "${jk1_name} max cell voltage"
+      name: "${jk_name} Max Cell Voltage"
     min_voltage_cell:
       id: min_voltage_cell
-      name: "${jk1_name} min voltage cell"
+      name: "${jk_name} Min Voltage Cell"
     max_voltage_cell:
       id: max_voltage_cell
-      name: "${jk1_name} max voltage cell"
+      name: "${jk_name} Max Voltage Cell"
     delta_cell_voltage:
       id: delta_cell_voltage
-      name: "${jk1_name} delta cell voltage"
+      name: "${jk_name} Delta Cell Voltage"
     average_cell_voltage:
-      name: "${jk1_name} average cell voltage"
+      name: "${jk_name} Average Cell Voltage"
     cells:
       id: cells
-      name: "${jk1_name} cells"
+      name: "${jk_name} Cells"
     cell_voltage_1:
-      name: "${jk1_name} cell voltage  1"
+      name: "${jk_name} Cell Voltage  1"
     cell_voltage_2:
-      name: "${jk1_name} cell voltage  2"
+      name: "${jk_name} Cell Voltage  2"
     cell_voltage_3:
-      name: "${jk1_name} cell voltage  3"
+      name: "${jk_name} Cell Voltage  3"
     cell_voltage_4:
-      name: "${jk1_name} cell voltage  4"
+      name: "${jk_name} Cell Voltage  4"
     cell_voltage_5:
-      name: "${jk1_name} cell voltage  5"
+      name: "${jk_name} Cell Voltage  5"
     cell_voltage_6:
-      name: "${jk1_name} cell voltage  6"
+      name: "${jk_name} Cell Voltage  6"
     cell_voltage_7:
-      name: "${jk1_name} cell voltage  7"
+      name: "${jk_name} Cell Voltage  7"
     cell_voltage_8:
-      name: "${jk1_name} cell voltage  8"
+      name: "${jk_name} Cell Voltage  8"
     cell_voltage_9:
-      name: "${jk1_name} cell voltage  9"
+      name: "${jk_name} Cell Voltage  9"
     cell_voltage_10:
-      name: "${jk1_name} cell voltage 10"
+      name: "${jk_name} Cell Voltage 10"
     cell_voltage_11:
-      name: "${jk1_name} cell voltage 11"
+      name: "${jk_name} Cell Voltage 11"
     cell_voltage_12:
-      name: "${jk1_name} cell voltage 12"
+      name: "${jk_name} Cell Voltage 12"
     cell_voltage_13:
-      name: "${jk1_name} cell voltage 13"
+      name: "${jk_name} Cell Voltage 13"
     cell_voltage_14:
-      name: "${jk1_name} cell voltage 14"
+      name: "${jk_name} Cell Voltage 14"
     cell_voltage_15:
-      name: "${jk1_name} cell voltage 15"
+      name: "${jk_name} Cell Voltage 15"
     cell_voltage_16:
-      name: "${jk1_name} cell voltage 16"
+      name: "${jk_name} Cell Voltage 16"
 #    cell_voltage_17:
-#      name: "${jk1_name} cell voltage 17"
+#      name: "${jk_name} Cell Voltage 17"
 #    cell_voltage_18:
-#      name: "${jk1_name} cell voltage 18"
+#      name: "${jk_name} Cell Voltage 18"
 #    cell_voltage_19:
-#      name: "${jk1_name} cell voltage 19"
+#      name: "${jk_name} Cell Voltage 19"
 #    cell_voltage_20:
-#      name: "${jk1_name} cell voltage 20"
+#      name: "${jk_name} Cell Voltage 20"
 #    cell_voltage_21:
-#      name: "${jk1_name} cell voltage 21"
+#      name: "${jk_name} Cell Voltage 21"
 #    cell_voltage_22:
-#      name: "${jk1_name} cell voltage 22"
+#      name: "${jk_name} Cell Voltage 22"
 #    cell_voltage_23:
-#      name: "${jk1_name} cell voltage 23"
+#      name: "${jk_name} Cell Voltage 23"
 #    cell_voltage_24:
-#      name: "${jk1_name} cell voltage 24"
+#      name: "${jk_name} Cell Voltage 24"
     power_tube_temperature:
       id: power_tube_temperature
-      name: "${jk1_name} power tube temperature"
+      name: "${jk_name} Power Tube Temperature"
     temperature_sensor_1:
       id: temperature_sensor_1
-      name: "${jk1_name} temperature sensor 1"
+      name: "${jk_name} Temperature Sensor 1"
     temperature_sensor_2:
       id: temperature_sensor_2
-      name: "${jk1_name} temperature sensor 2"
+      name: "${jk_name} Temperature Sensor 2"
     total_voltage:
       id: total_voltage
-      name: "${jk1_name} total voltage"
+      name: "${jk_name} Total Voltage"
     current:
       id: current
-      name: "${jk1_name} current"
+      name: "${jk_name} Current"
     power:
-      name: "${jk1_name} power"
+      name: "${jk_name} Power"
     charging_power:
-      name: "${jk1_name} charging power"
+      name: "${jk_name} Charging Power"
     discharging_power:
-      name: "${jk1_name} discharging power"
+      name: "${jk_name} Discharging Power"
     capacity_remaining:
       id: capacity_remaining
-      name: "${jk1_name} capacity remaining"
+      name: "${jk_name} Capacity Remaining"
     capacity_remaining_derived:
-      name: "${jk1_name} capacity remaining derived"
+      name: "${jk_name} Capacity Remaining Derived"
     temperature_sensors:
-      name: "${jk1_name} temperature sensors"
+      name: "${jk_name} Temperature Sensors"
     charging_cycles:
-      name: "${jk1_name} charging cycles"
+      name: "${jk_name} Charging Cycles"
       id: charging_cycles
     total_charging_cycle_capacity:
-      name: "${jk1_name} total charging cycle capacity"
+      name: "${jk_name} Total Charging Cycle Capacity"
     battery_strings:
-      name: "${jk1_name} battery strings"
+      name: "${jk_name} Battery Strings"
     errors_bitmask:
       id: errors_bitmask
-      name: "${jk1_name} errors bitmask"
+      name: "${jk_name} Errors Bitmask"
     operation_mode_bitmask:
-      name: "${jk1_name} operation mode bitmask"
+      name: "${jk_name} Operation Mode Bitmask"
     total_voltage_overvoltage_protection:
       id: total_voltage_overvoltage_protection
-      name: "${jk1_name} total voltage overvoltage protection"
+      name: "${jk_name} Total Voltage Overvoltage Protection"
     total_voltage_undervoltage_protection:
       id: total_voltage_undervoltage_protection
-      name: "${jk1_name} total voltage undervoltage protection"
+      name: "${jk_name} Total Voltage Undervoltage Protection"
     cell_voltage_overvoltage_protection:
       id: cell_voltage_overvoltage_protection
-      name: "${jk1_name} cell voltage overvoltage protection"
+      name: "${jk_name} Cell Voltage Overvoltage Protection"
     cell_voltage_overvoltage_recovery:
       id: cell_voltage_overvoltage_recovery
-      name: "${jk1_name} cell voltage overvoltage recovery"
+      name: "${jk_name} Cell Voltage Overvoltage Recovery"
     cell_voltage_overvoltage_delay:
-      name: "${jk1_name} cell voltage overvoltage delay"
+      name: "${jk_name} Cell Voltage Overvoltage Delay"
     cell_voltage_undervoltage_protection:
       id: cell_voltage_undervoltage_protection
-      name: "${jk1_name} cell voltage undervoltage protection"
+      name: "${jk_name} Cell Voltage Undervoltage Protection"
     cell_voltage_undervoltage_recovery:
       id: cell_voltage_undervoltage_recovery
-      name: "${jk1_name} cell voltage undervoltage recovery"
+      name: "${jk_name} Cell Voltage Undervoltage Recovery"
     cell_voltage_undervoltage_delay:
-      name: "${jk1_name} cell voltage undervoltage delay"
+      name: "${jk_name} Cell Voltage Undervoltage Delay"
     cell_pressure_difference_protection:
-      name: "${jk1_name} cell pressure difference protection"
+      name: "${jk_name} Cell Pressure Difference Protection"
     discharging_overcurrent_protection:
       id: discharging_overcurrent_protection
-      name: "${jk1_name} discharging overcurrent protection"
+      name: "${jk_name} Discharging Overcurrent Protection"
     discharging_overcurrent_delay:
-      name: "${jk1_name} discharging overcurrent delay"
+      name: "${jk_name} Discharging Overcurrent Delay"
     charging_overcurrent_protection:
       id: charging_overcurrent_protection
-      name: "${jk1_name} charging overcurrent protection"
+      name: "${jk_name} Charging Overcurrent Protection"
     charging_overcurrent_delay:
-      name: "${jk1_name} charging overcurrent delay"
+      name: "${jk_name} Charging Overcurrent Delay"
     balance_starting_voltage:
       id: balance_starting_voltage
-      name: "${jk1_name} balance starting voltage"
+      name: "${jk_name} Balance Starting Voltage"
     balance_opening_pressure_difference:
       id: balance_opening_pressure_difference
-      name: "${jk1_name} balance opening pressure difference"
+      name: "${jk_name} Balance Opening Pressure Difference"
     power_tube_temperature_protection:
       id: power_tube_temperature_protection
-      name: "${jk1_name} power tube temperature protection"
+      name: "${jk_name} Power Tube Temperature Protection"
     power_tube_temperature_recovery:
       id: power_tube_temperature_recovery
-      name: "${jk1_name} power tube temperature recovery"
+      name: "${jk_name} Power Tube Temperature Recovery"
     temperature_sensor_temperature_protection:
       id: temperature_sensor_temperature_protection
-      name: "${jk1_name} temperature sensor temperature protection"
+      name: "${jk_name} Temperature Sensor Temperature Protection"
     temperature_sensor_temperature_recovery:
       id: temperature_sensor_temperature_recovery
-      name: "${jk1_name} temperature sensor temperature recovery"
+      name: "${jk_name} Temperature Sensor Temperature Recovery"
     temperature_sensor_temperature_difference_protection:
-      name: "${jk1_name} temperature sensor temperature difference protection"
+      name: "${jk_name} Temperature Sensor Temperature Difference Protection"
     charging_high_temperature_protection:
       id: charging_high_temperature_protection
-      name: "${jk1_name} charging high temperature protection"
+      name: "${jk_name} Charging High Temperature Protection"
     discharging_high_temperature_protection:
       id: discharging_high_temperature_protection
-      name: "${jk1_name} discharging high temperature protection"
+      name: "${jk_name} Discharging High Temperature Protection"
     charging_low_temperature_protection:
       id: charging_low_temperature_protection
-      name: "${jk1_name} charging low temperature protection"
+      name: "${jk_name} Charging Low Temperature Protection"
     charging_low_temperature_recovery:
       id: charging_low_temperature_recovery
-      name: "${jk1_name} charging low temperature recovery"
+      name: "${jk_name} Charging Low Temperature Recovery"
     discharging_low_temperature_protection:
       id: discharging_low_temperature_protection
-      name: "${jk1_name} discharging low temperature protection"
+      name: "${jk_name} Discharging Low Temperature Protection"
     discharging_low_temperature_recovery:
       id: discharging_low_temperature_recovery
-      name: "${jk1_name} discharging low temperature recovery"
+      name: "${jk_name} Discharging Low Temperature Recovery"
     total_battery_capacity_setting:
-      name: "${jk1_name} total battery capacity setting"
+      name: "${jk_name} Total Battery Capacity Setting"
     current_calibration:
-      name: "${jk1_name} current calibration"
+      name: "${jk_name} Current Calibration"
     device_address:
-      name: "${jk1_name} device address"
+      name: "${jk_name} Device Address"
     sleep_wait_time:
-      name: "${jk1_name} sleep wait time"
+      name: "${jk_name} Sleep Wait Time"
     alarm_low_volume:
-      name: "${jk1_name} alarm low volume"
+      name: "${jk_name} Alarm Low Volume"
     manufacturing_date:
-      name: "${jk1_name} manufacturing date"
+      name: "${jk_name} Manufacturing Date"
     total_runtime:
-      name: "${jk1_name} total runtime"
+      name: "${jk_name} Total Runtime"
 #    start_current_calibration:
-#      name: "${jk1_name} start current calibration"
+#      name: "${jk_name} Start Current Calibration"
     actual_battery_capacity:
-      name: "${jk1_name} actual battery capacity"
+      name: "${jk_name} Actual Battery Capacity"
 #    protocol_version:
-#      name: "${jk1_name} protocol version"
+#      name: "${jk_name} Protocol Version"
 # Uptime sensor
   - platform: uptime
     name: Uptime Sensor
@@ -1028,21 +1026,21 @@ sensor:
   # Modbus to DEYE Inverter
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Heat sink temperature"
-    id: sun12k_koleplade_temeratur
+    name: "${deye_name} Heat Sink Temperature"
+    id: deye_heat_sink_temeratur
     register_type: holding
     address: 541
     unit_of_measurement: "°C"
     value_type: S_WORD
-    accuracy_decimals: 2
+    accuracy_decimals: 1
     filters:
       - offset: -1000
       - multiply:  0.1
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} load frequency"
-    id: sun12k_load_frequency
+    name: "${deye_name} Load Frequency"
+    id: deye_load_frequency
     register_type: holding
     address: 655
     unit_of_measurement: "Hz"
@@ -1054,8 +1052,8 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} inverter-frequency"
-    id: sun12k_inverter_frequency
+    name: "${deye_name} Inverter Frequency"
+    id: deye_inverter_frequency
     register_type: holding
     address: 638
     unit_of_measurement: "Hz"
@@ -1068,7 +1066,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     name: "${deye_name} PV1 Power"
-    id: sun12k_PV1_Power
+    id: deye_PV1_Power
     register_type: holding
     address: 672
     unit_of_measurement: "W"
@@ -1079,7 +1077,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     name: "${deye_name} PV2 Power"
-    id: sun12k_PV2_Power
+    id: deye_PV2_Power
     register_type: holding
     address: 673
     unit_of_measurement: "W"
@@ -1090,12 +1088,12 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     name: "${deye_name} PV1 Voltage"
-    id: sun12k_PV1_Voltage
+    id: deye_PV1_Voltage
     register_type: holding
     address: 676
     unit_of_measurement: "V"
     state_class: "measurement"
-    accuracy_decimals: 0
+    accuracy_decimals: 1
     filters:
       - multiply: 0.1
     value_type: U_WORD
@@ -1103,12 +1101,12 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     name: "${deye_name} PV2 Voltage"
-    id: sun12k_PV2_Voltage
+    id: deye_PV2_Voltage
     register_type: holding
     address: 678
     unit_of_measurement: "V"
     state_class: "measurement"
-    accuracy_decimals: 0
+    accuracy_decimals: 1
     filters:
       - multiply: 0.1
     value_type: U_WORD
@@ -1116,7 +1114,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     name: "${deye_name} PV1 Current"
-    id: sun12k_PV1_Current
+    id: deye_PV1_Current
     register_type: holding
     address: 677
     unit_of_measurement: "A"
@@ -1129,7 +1127,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     name: "${deye_name} PV2 Current"
-    id: sun12k_PV2_Current
+    id: deye_PV2_Current
     register_type: holding
     address: 679
     unit_of_measurement: "A"
@@ -1137,13 +1135,30 @@ sensor:
     accuracy_decimals: 1
     filters:
       - multiply: 0.1
-    value_type: U_WORD  
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    skip_updates: 6
+    name: "${deye_name} Daily Load Consumption"
+    id: deye_Daily_Load_Consumption
+    icon: mdi:home-lightning-bolt
+    register_type: holding
+    address: 526
+    unit_of_measurement: "kWh"
+    state_class: "total_increasing"
+    device_class: energy
+    accuracy_decimals: 1
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
     name: "${deye_name} Daily Production"
-    id: sun12k_Daily_Production
+    id: deye_Daily_Production
+    icon: mdi:solar-power
     register_type: holding
     address: 529
     unit_of_measurement: "kWh"
@@ -1152,13 +1167,45 @@ sensor:
     accuracy_decimals: 1
     filters:
       - multiply: 0.1
-    value_type: U_WORD  
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    skip_updates: 6
+    name: "${deye_name} Daily PV1 Production"
+    id: deye_Daily_PV1_Production
+    icon: mdi:solar-power
+    register_type: holding
+    address: 530
+    unit_of_measurement: "kWh"
+    state_class: "total_increasing"
+    device_class: energy
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    value_type: U_WORD
+  
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    skip_updates: 6
+    name: "${deye_name} Daily PV2 Production"
+    id: deye_Daily_PV2_Production
+    icon: mdi:solar-power
+    register_type: holding
+    address: 531
+    unit_of_measurement: "kWh"
+    state_class: "total_increasing"
+    device_class: energy
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+    value_type: U_WORD
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
     name: "${deye_name} Total PV Production"
-    id: sun12k_Total_PV_Production
+    id: deye_Total_PV_Production
     register_type: holding
     address: 534
     unit_of_measurement: "kWh"
@@ -1172,7 +1219,7 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     name: "${deye_name} Total Grid Power"   # Grid side total power
-    id: sun12k_Total_Grid_Power
+    id: deye_Total_Grid_Power
     register_type: holding
     address: 625
     unit_of_measurement: "W"
@@ -1184,7 +1231,8 @@ sensor:
     modbus_controller_id: modbus_deye
     skip_updates: 6
     name: "${deye_name} Daily Energy Bought"
-    id: sun12k_Daily_Energy_Bought
+    id: deye_Daily_Energy_Bought
+    icon: mdi:transmission-tower-export
     register_type: holding
     address: 520
     unit_of_measurement: "kWh"
@@ -1199,7 +1247,8 @@ sensor:
     modbus_controller_id: modbus_deye
     skip_updates: 6
     name: "${deye_name} Daily Energy Sold"
-    id: sun12k_Daily_Energy_Sold
+    id: deye_Daily_Energy_Sold
+    icon: mdi:transmission-tower-import
     register_type: holding
     address: 521
     unit_of_measurement: "kWh"
@@ -1214,43 +1263,13 @@ sensor:
     modbus_controller_id: modbus_deye
     skip_updates: 6
     name: "${deye_name} Total Energy Bought"
-    id: sun12k_Total_Energy_Bought
+    id: deye_Total_Energy_Bought
     register_type: holding
     address: 522
     unit_of_measurement: "kWh"
     state_class: "total_increasing"
     device_class: energy
     accuracy_decimals: 1
-    value_type: U_WORD
-    filters:
-      - multiply: 0.1
- 
-  - platform: modbus_controller
-    modbus_controller_id: modbus_deye
-    skip_updates: 6
-    name: "${deye_name} Total Energy Sold"
-    id: sun12k_Total_Energy_Sold
-    register_type: holding
-    address: 524
-    unit_of_measurement: "kWh"
-    state_class: "total_increasing"
-    device_class: energy
-    accuracy_decimals: 1
-    value_type: U_WORD
-    filters:
-      - multiply: 0.1
- 
-  - platform: modbus_controller #Total Consumption
-    modbus_controller_id: modbus_deye
-    skip_updates: 6
-    name: "${deye_name} Total Consumption"
-    id: sun12k_Total_Consumption
-    register_type: holding
-    address: 527
-    unit_of_measurement: "kWh"
-    state_class: "total_increasing"
-    device_class: energy
-    accuracy_decimals: 2
     value_type: U_DWORD_R
     filters:
       - multiply: 0.1
@@ -1258,8 +1277,38 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
-    name: "${deye_name} power generation of today"
-    id: sun12k_power_generation_of_today
+    name: "${deye_name} Total Energy Sold"
+    id: deye_Total_Energy_Sold
+    register_type: holding
+    address: 524
+    unit_of_measurement: "kWh"
+    state_class: "total_increasing"
+    device_class: energy
+    accuracy_decimals: 1
+    value_type: U_DWORD_R
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller #Total Consumption
+    modbus_controller_id: modbus_deye
+    skip_updates: 6
+    name: "${deye_name} Total Consumption"
+    id: deye_Total_Consumption
+    register_type: holding
+    address: 527
+    unit_of_measurement: "kWh"
+    state_class: "total_increasing"
+    device_class: energy
+    accuracy_decimals: 1
+    value_type: U_DWORD_R
+    filters:
+      - multiply: 0.1
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    skip_updates: 6
+    name: "${deye_name} Power Generation Today"
+    id: deye_power_generation_today
     register_type: holding
     address: 501
     unit_of_measurement: "kWh"
@@ -1272,142 +1321,142 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     name: "${deye_name} Grid Current L1"
-    id: sun12k_Grid_Current_L1
+    id: deye_Grid_Current_L1
     register_type: holding
     address: 630
     unit_of_measurement: "A"
     state_class: "measurement"
-    accuracy_decimals: 1
+    accuracy_decimals: 2
     filters:
       - multiply: 0.01
     value_type: S_WORD  
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     name: "${deye_name} Grid Current L2"
-    id: sun12k_Grid_Current_L2
+    id: deye_Grid_Current_L2
     register_type: holding
     address: 631
     unit_of_measurement: "A"
     state_class: "measurement"
-    accuracy_decimals: 1
+    accuracy_decimals: 2
     filters:
       - multiply: 0.01
     value_type: S_WORD   
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 2
     name: "${deye_name} Grid Current L3"
-    id: sun12k_Grid_Current_L3
+    id: deye_Grid_Current_L3
     register_type: holding
     address: 632
     unit_of_measurement: "A"
     state_class: "measurement"
-    accuracy_decimals: 1
+    accuracy_decimals: 2
     filters:
       - multiply: 0.01
-    value_type: S_WORD   
+    value_type: S_WORD
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 6
     name: "${deye_name} Grid Voltage L1"
-    id: sun12k_Grid_Voltage_L1
+    id: deye_Grid_Voltage_L1
     register_type: holding
     address: 598
     unit_of_measurement: "V"
     state_class: "measurement"
-    accuracy_decimals: 0
+    accuracy_decimals: 1
     filters:
       - multiply: 0.1
     value_type: U_WORD     
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 6
     name: "${deye_name} Grid Voltage L2"
-    id: sun12k_Grid_Voltage_L2
+    id: deye_Grid_Voltage_L2
     register_type: holding
     address: 599
     unit_of_measurement: "V"
     state_class: "measurement"
-    accuracy_decimals: 0
+    accuracy_decimals: 1
     filters:
       - multiply: 0.1
     value_type: U_WORD     
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 2
+    #skip_updates: 6
     name: "${deye_name} Grid Voltage L3"
-    id: sun12k_Grid_Voltage_L3
+    id: deye_Grid_Voltage_L3
     register_type: holding
     address: 600
     unit_of_measurement: "V"
     state_class: "measurement"
-    accuracy_decimals: 0
+    accuracy_decimals: 1
     filters:
       - multiply: 0.1
     value_type: U_WORD  
 
  
-  # - platform: modbus_controller
-  #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
-  #   name: "${deye_name} Internal CT L1 Power"
-  #   id: sun12k_Internal_CT_L1_Power
-  #   register_type: holding
-  #   address: 604
-  #   unit_of_measurement: "W"
-  #   state_class: "measurement"
-  #   accuracy_decimals: 0
-  #   value_type: S_WORD  
- 
-  # - platform: modbus_controller
-  #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
-  #   name: "${deye_name} Internal CT L2 Power"
-  #   id: sun12k_Internal_CT_L2_Power
-  #   register_type: holding
-  #   address: 605
-  #   unit_of_measurement: "W"
-  #   state_class: "measurement"
-  #   accuracy_decimals: 0
-  #   value_type: S_WORD  
- 
-  # - platform: modbus_controller
-  #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
-  #   name: "${deye_name} Internal CT L3 Power"
-  #   id: sun12k_Internal_CT_L3_Power
-  #   register_type: holding
-  #   address: 606
-  #   unit_of_measurement: "W"
-  #   state_class: "measurement"
-  #   accuracy_decimals: 0
-  #   value_type: S_WORD  
- 
-  # - platform: modbus_controller
-  #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
-  #   name: "${deye_name} Internal total Power" 
-  #   id: sun12k_Internal_total_Power
-  #   register_type: holding
-  #   address: 607
-  #   unit_of_measurement: "W"
-  #   state_class: "measurement"
-  #   accuracy_decimals: 0
-  #   value_type: S_WORD   
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    # skip_updates: 2
+    name: "${deye_name} Internal CT L1 Power"
+    id: deye_Internal_CT_L1_Power
+    register_type: holding
+    address: 604
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 2
+    name: "${deye_name} Internal CT L2 Power"
+    id: deye_Internal_CT_L2_Power
+    register_type: holding
+    address: 605
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD  
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    # skip_updates: 2
+    name: "${deye_name} Internal CT L3 Power"
+    id: deye_Internal_CT_L3_Power
+    register_type: holding
+    address: 606
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD  
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    # skip_updates: 2
+    name: "${deye_name} Internal Total Power"
+    id: deye_Internal_total_Power
+    register_type: holding
+    address: 607
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD   
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    # skip_updates: 2
     name: "${deye_name} External CT L1 Power"
-    id: sun12k_External_CT_L1_Power
+    id: deye_External_CT_L1_Power
     register_type: holding
     address: 616
     unit_of_measurement: "W"
@@ -1417,9 +1466,9 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 2
     name: "${deye_name} External CT L2 Power"
-    id: sun12k_External_CT_L2_Power
+    id: deye_External_CT_L2_Power
     register_type: holding
     address: 617
     unit_of_measurement: "W"
@@ -1429,9 +1478,9 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 2
     name: "${deye_name} External CT L3 Power"
-    id: sun12k_External_CT_L3_Power
+    id: deye_External_CT_L3_Power
     register_type: holding
     address: 618
     unit_of_measurement: "W"
@@ -1441,8 +1490,8 @@ sensor:
  
   - platform: modbus_controller  
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Grid total power"
-    id: sun12k_grid_total_power
+    name: "${deye_name} Grid Total Power"
+    id: deye_grid_total_power
     register_type: holding
     address: 619
     unit_of_measurement: "W"
@@ -1452,8 +1501,8 @@ sensor:
     
   - platform: modbus_controller # Load totalpower
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Load total power" 
-    id: sun12k_load_totalpower
+    name: "${deye_name} Load Total Power" 
+    id: deye_load_total_power
     register_type: holding
     address: 653
     unit_of_measurement: "W"
@@ -1464,8 +1513,8 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
-    name: "${deye_name} Warning1"
-    id:  sun12k_Warning1
+    name: "${deye_name} Warning 1"
+    id:  deye_warning_1
     register_type: holding
     address: 553
     accuracy_decimals: 0
@@ -1474,8 +1523,8 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
-    name: "${deye_name} Warning2"
-    id:  sun12k_Warning2
+    name: "${deye_name} Warning 2"
+    id:  deye_warning_2
     register_type: holding
     address: 554
     accuracy_decimals: 0
@@ -1484,8 +1533,8 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
-    name: "${deye_name} Warning3"
-    id:  sun12k_Warning3
+    name: "${deye_name} Error 1"
+    id:  deye_error_1
     register_type: holding
     address: 555
     accuracy_decimals: 0
@@ -1494,8 +1543,8 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
-    name: "${deye_name} Error1"
-    id:  sun12k_Error1
+    name: "${deye_name} Error 2"
+    id:  deye_error_2
     register_type: holding
     address: 556
     accuracy_decimals: 0
@@ -1504,18 +1553,18 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
-    name: "${deye_name} Error2"
-    id:  sun12k_Error2
+    name: "${deye_name} Error 3"
+    id:  deye_error_3
     register_type: holding
     address: 557
     accuracy_decimals: 0
     value_type: U_WORD
- 
+  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 6
-    name: "${deye_name} Error3"
-    id:  sun12k_Error3
+    name: "${deye_name} Error 4"
+    id:  deye_error_4
     register_type: holding
     address: 558
     accuracy_decimals: 0
@@ -1523,9 +1572,8 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-
     name: "${deye_name} Failure status of communication board"
-    id:  sun12k_Failure_status_of_communication_board
+    id:  deye_Failure_status_of_communication_board
     register_type: holding
     address: 548
     accuracy_decimals: 0
@@ -1534,9 +1582,41 @@ sensor:
   # Battery
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
+    skip_updates: 6
+    name: "${deye_name} Daily Battery Charge"
+    id: deye_Daily_Battery_Charge
+    icon: mdi:battery-plus
+    register_type: holding
+    address: 514
+    unit_of_measurement: "kWh"
+    state_class: "total_increasing"
+    device_class: energy
+    accuracy_decimals: 1
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
+  
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    skip_updates: 6
+    name: "${deye_name} Daily Battery Discharge"
+    id: deye_Daily_Battery_Discharge
+    icon: mdi:battery-minus
+    register_type: holding
+    address: 515
+    unit_of_measurement: "kWh"
+    state_class: "total_increasing"
+    device_class: energy
+    accuracy_decimals: 1
+    value_type: U_WORD
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
     skip_updates: 60
-    name: "${deye_name} Total charge of the battery"
-    id:  sun12k_battery_total_charge
+    name: "${deye_name} Battery Total Charge"
+    id:  deye_battery_total_charge
     register_type: holding
     address: 516
     unit_of_measurement: "kWh"
@@ -1550,22 +1630,22 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     skip_updates: 60
-    name: "${deye_name} Total discharge of the battery"
-    id:  sun12k_battery_total_discharge
+    name: "${deye_name} Battery Total Discharge"
+    id:  deye_battery_total_discharge
     register_type: holding
     address: 518
     unit_of_measurement: "kWh"
     state_class: "total_increasing"
     device_class: energy
     accuracy_decimals: 1
-    value_type: U_DWORD_R 
+    value_type: U_DWORD_R
     filters:
       - multiply: 0.1
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} battery temperature"
-    id:  sun12k_battery_temperature
+    name: "${deye_name} Battery Temperature"
+    id:  deye_battery_temperature
     register_type: holding
     address: 586
     unit_of_measurement: "°C"
@@ -1577,8 +1657,8 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} battery voltage"
-    id: sun12k_battery_voltage
+    name: "${deye_name} Battery Voltage"
+    id: deye_battery_voltage
     register_type: holding
     address: 587  
     unit_of_measurement: "V"
@@ -1591,8 +1671,8 @@ sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     #skip_updates: 2
-    name: "${deye_name} battery capacity"
-    id: sun12k_battery_capacity
+    name: "${deye_name} Battery Capacity"
+    id: deye_battery_capacity
     register_type: holding
     address: 588
     unit_of_measurement: "%"
@@ -1602,8 +1682,8 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Battery output power"
-    id: sun12k_Battery_output_power
+    name: "${deye_name} Battery Output Power"
+    id: deye_Battery_output_power
     register_type: holding
     address: 590
     unit_of_measurement: "W"
@@ -1613,8 +1693,8 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Battery output current"
-    id: sun12k_Battery_output_current
+    name: "${deye_name} Battery Output Current"
+    id: deye_Battery_output_current
     register_type: holding
     address: 591
     unit_of_measurement: "A"
@@ -1627,21 +1707,21 @@ sensor:
 text_sensor:
   - platform: jk_bms
     errors:
-      name: "${jk1_name} errors"
+      name: "${jk_name} Errors"
     operation_mode:
-      name: "${jk1_name} operation mode"
+      name: "${jk_name} Operation Mode"
     battery_type:
-      name: "${jk1_name} battery type"
+      name: "${jk_name} Battery Type"
     password:
-      name: "${jk1_name} password"
+      name: "${jk_name} Password"
     device_type:
-      name: "${jk1_name} device type"
+      name: "${jk_name} Device Type"
     software_version:
-      name: "${jk1_name} software version"
+      name: "${jk_name} Software Version"
     manufacturer:
-      name: "${jk1_name} manufacturer"
+      name: "${jk_name} Manufacturer"
     total_runtime_formatted:
-      name: "${jk1_name} total runtime formatted"
+      name: "${jk_name} Total Runtime Formatted"
 # Template text sensors
   - platform: template
     name: Uptime Human Readable
@@ -1665,12 +1745,12 @@ text_sensor:
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
     #skip_updates: 2
-    id: sun12k_Running_Status
+    id: deye_Running_Status
     bitmask: 0
     register_type: holding
     address: 500
     raw_encode: HEXBYTES
-    name: ${deye_name} Running Status
+    name: "${deye_name} Running Status"
     lambda: |-
       uint16_t value = modbus_controller::word_from_hex_str(x, 0);
       switch (value) {
@@ -1799,272 +1879,318 @@ number:
   - platform: modbus_controller
     use_write_multiple: true
     modbus_controller_id: modbus_deye
-    id: sun12k_Maximum_battery_charge_current
-    name: "${deye_name} Maximum battery charge current"
+    id: deye_Maximum_battery_charge_current
+    name: "${deye_name} Maximum Battery Charge Current"
     unit_of_measurement: A
     address: 108
     min_value: 0
     max_value: 240
+    mode: slider
     step: 1
     value_type: U_WORD
+    entity_category: config
     
   - platform: modbus_controller
     use_write_multiple: true
     modbus_controller_id: modbus_deye
-    id: sun12k_Maximum_battery_discharge_current
-    name: "${deye_name} Maximum battery discharge current"
+    id: deye_Maximum_battery_discharge_current
+    name: "${deye_name} Maximum Battery Discharge Current"
     unit_of_measurement: A
     address: 109
     min_value: 0
     max_value: 240
+    mode: slider
     step: 1
     value_type: U_WORD
+    entity_category: config
 
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Maximum_battery_grid_charge_current
-  #   name: "${deye_name} Maximum battery_grid charge current"
+  #   id: deye_Maximum_battery_grid_charge_current
+  #   name: "${deye_name} Maximum Battery Grid charge current"
   #   unit_of_measurement: A
   #   address: 128
   #   min_value: 0
   #   max_value: 240
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
-
+  #   entity_category: config
+  
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_max_solar_sell_power
+  #   id: deye_max_solar_sell_power
   #   name: "${deye_name} Max Solar Sell Power"
   #   unit_of_measurement: W
   #   address: 143
   #   min_value: 0
   #   max_value: 12000
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
 
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_1
-  #   name: "${deye_name} Time point 1 start"
+  #   id: deye_Time_point_1
+  #   name: "${deye_name} Time Point 1 Start"
   #   address: 148
   #   min_value: 0
   #   max_value: 2359
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_2
-  #   name: "${deye_name} Time point 2 start"
+  #   id: deye_Time_point_2
+  #   name: "${deye_name} Time Point 2 Start"
   #   address: 149
   #   min_value: 0
   #   max_value: 2359
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_3
-  #   name: "${deye_name} Time point 3 start"
+  #   id: deye_Time_point_3
+  #   name: "${deye_name} Time Point 3 Start"
   #   address: 150
   #   min_value: 0
   #   max_value: 2359
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_4
-  #   name: "${deye_name} Time point 4 start"
+  #   id: deye_Time_point_4
+  #   name: "${deye_name} Time Point 4 Start"
   #   address: 151
   #   min_value: 0
   #   max_value: 2359
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_5
-  #   name: "${deye_name} Time point 5 start"
+  #   id: deye_Time_point_5
+  #   name: "${deye_name} Time Point 5 Start"
   #   address: 152
   #   min_value: 0
   #   max_value: 2359
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_6
-  #   name: "${deye_name} Time point 6 start"
+  #   id: deye_Time_point_6
+  #   name: "${deye_name} Time Point 6 Start"
   #   address: 153
   #   min_value: 0
   #   max_value: 2359
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_1_power
-  #   name: "${deye_name} Time point 1 power"
+  #   id: deye_Time_point_1_power
+  #   name: "${deye_name} Time Point 1 Power"
   #   unit_of_measurement: W
   #   address: 154
   #   min_value: 0
   #   max_value: 12000
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_2_power
-  #   name: "${deye_name} Time point 2 power"
+  #   id: deye_Time_point_2_power
+  #   name: "${deye_name} Time Point 2 Power"
   #   unit_of_measurement: W
   #   address: 155
   #   min_value: 0
   #   max_value: 12000
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_3_power
-  #   name: "${deye_name} Time point 3 power"
+  #   id: deye_Time_point_3_power
+  #   name: "${deye_name} Time Point 3 Power"
   #   unit_of_measurement: W
   #   address: 156
   #   min_value: 0
   #   max_value: 12000
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_4_power
-  #   name: "${deye_name} Time point 4 power"
+  #   id: deye_Time_point_4_power
+  #   name: "${deye_name} Time Point 4 Power"
   #   unit_of_measurement: W
   #   address: 157
   #   min_value: 0
   #   max_value: 12000
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_5_power
-  #   name: "${deye_name} Time point 5 power"
+  #   id: deye_Time_point_5_power
+  #   name: "${deye_name} Time Point 5 Power"
   #   unit_of_measurement: W
   #   address: 158
   #   min_value: 0
   #   max_value: 12000
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_6_power
-  #   name: "${deye_name} Time point 6 power"
+  #   id: deye_Time_point_6_power
+  #   name: "${deye_name} Time Point 6 Power"
   #   unit_of_measurement: W
   #   address: 159
   #   min_value: 0
   #   max_value: 12000
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
 
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_1_capacity
-  #   name: "${deye_name} Time point 1 capacity"
+  #   id: deye_Time_point_1_capacity
+  #   name: "${deye_name} Time Point 1 Capacity"
   #   unit_of_measurement: "%"
   #   address: 166
   #   min_value: 0
   #   max_value: 100
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_2_capacity
-  #   name: "${deye_name} Time point 2 capacity"
+  #   id: deye_Time_point_2_capacity
+  #   name: "${deye_name} Time Point 2 Capacity"
   #   unit_of_measurement: "%"
   #   address: 167
   #   min_value: 0
   #   max_value: 100
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_3_capacity
-  #   name: "${deye_name} Time point 3 capacity"
+  #   id: deye_Time_point_3_capacity
+  #   name: "${deye_name} Time Point 3 Capacity"
   #   unit_of_measurement: "%"
   #   address: 168
   #   min_value: 0
   #   max_value: 100
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_4_capacity
-  #   name: "${deye_name} Time point 4 capacity"
+  #   id: deye_Time_point_4_capacity
+  #   name: "${deye_name} Time Point 4 Capacity"
   #   unit_of_measurement: "%"
   #   address: 169
   #   min_value: 0
   #   max_value: 100
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_5_capacity
-  #   name: "${deye_name} Time point 5 capacity"
+  #   id: deye_Time_point_5_capacity
+  #   name: "${deye_name} Time Point 5 Capacity"
   #   unit_of_measurement: "%"
   #   address: 170
   #   min_value: 0
   #   max_value: 100
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
     
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_Time_point_6_capacity
-  #   name: "${deye_name} Time point 6 capacity"
+  #   id: deye_Time_point_6_capacity
+  #   name: "${deye_name} Time Point 6 Capacity"
   #   unit_of_measurement: "%"
   #   address: 171
   #   min_value: 0
   #   max_value: 100
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
 
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   id: sun12k_max_solar_power
+  #   id: deye_max_solar_power
   #   name: "${deye_name} Max Solar Sell Power"
   #   unit_of_measurement: W
   #   address: 340
   #   min_value: 0
   #   max_value: 15600
+  #   mode: slider
   #   step: 1
   #   value_type: U_WORD
+  #   entity_category: config
 
 script:
   - id: balancing_script
@@ -2116,7 +2242,7 @@ switch:
   - platform: modbus_controller
     use_write_multiple: true
     modbus_controller_id: modbus_deye
-    name: ${deye_name} Battery Type Lithium
+    name: "${deye_name} Battery Type Lithium"
     register_type: holding
     address: 98
     bitmask: 1
@@ -2125,7 +2251,7 @@ switch:
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Solar sell
+  #   name: "${deye_name} Solar Sell"
   #   register_type: holding
   #   address: 145
   #   bitmask: 1
@@ -2134,7 +2260,7 @@ switch:
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Grid Charge
+  #   name: "${deye_name} Grid Charge"
   #   register_type: holding
   #   address: 130
   #   bitmask: 1
@@ -2143,8 +2269,8 @@ switch:
   # - platform: modbus_controller  # Advanced peak shaving and valley filling function enabled
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Time of Use 
-  #   id: sun12k_Time_of_Use
+  #   name: "${deye_name} Time of Use" 
+  #   id: deye_Time_of_Use
   #   register_type: holding
   #   address: 146
   #   bitmask: 1
@@ -2153,7 +2279,7 @@ switch:
   # - platform: modbus_controller  # Time point 1 enable grid or gen charge
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Time point 1 charge enable
+  #   name: "${deye_name} Time Point 1 Charge Enable"
   #   register_type: holding
   #   address: 172
   #   bitmask: 1   # 1 = grid charging enable 2 = gen charging enable
@@ -2162,7 +2288,7 @@ switch:
   # - platform: modbus_controller  # Time point 2 enable grid or gen charge
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Time point 2 charge enable
+  #   name: "${deye_name} Time Point 2 Charge Enable"
   #   register_type: holding
   #   address: 173
   #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
@@ -2171,7 +2297,7 @@ switch:
   # - platform: modbus_controller  # Time point 3 enable grid or gen charge
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Time point 3 charge enable
+  #   name: "${deye_name} Time Point 3 Charge Enable"
   #   register_type: holding
   #   address: 174
   #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
@@ -2180,7 +2306,7 @@ switch:
   # - platform: modbus_controller  # Time point 4 enable grid or gen charge
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Time point 4 charge enable
+  #   name: "${deye_name} Time Point 4 Charge Enable"
   #   register_type: holding
   #   address: 175
   #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
@@ -2189,7 +2315,7 @@ switch:
   # - platform: modbus_controller  # Time point 5 enable grid or gen charge
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Time point 5 charge enable
+  #   name: "${deye_name} Time Point 5 Charge Enable"
   #   register_type: holding
   #   address: 176
   #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
@@ -2198,7 +2324,7 @@ switch:
   # - platform: modbus_controller  # Time point 6 enable grid or gen charge
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Time point 6 charge enable
+  #   name: "${deye_name} Time Point 6 Charge Enable"
   #   register_type: holding
   #   address: 177
   #   bitmask: 1    # 1 = grid charging enable 2 = gen charging enable
@@ -2210,29 +2336,32 @@ select:
   - platform: modbus_controller
     use_write_multiple: true
     modbus_controller_id: modbus_deye
-    name: ${deye_name} Energy priority
+    name: "${deye_name} Energy Priority"
     address: 141
     value_type: U_WORD
     optionsmap:
       "Battery first": 0
       "Load first": 1
+    entity_category: config
   # - platform: modbus_controller
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: ${deye_name} Limit control mode
+  #   name: "${deye_name} Limit Control Mode"
   #   address: 142
   #   value_type: U_WORD
   #   optionsmap:
   #     "Selling first": 0
   #     "Zero export to load": 1
   #     "Zero export to CT": 2
+  #   entity_category: config    
   - platform: modbus_controller
     use_write_multiple: true
     modbus_controller_id: modbus_deye
-    name: ${deye_name} Battery control mode
+    name: "${deye_name} Battery Control Mode"
     address: 111
     value_type: U_WORD
     optionsmap:
       "Use Battery V": 0
       "Use Battery %": 1
       "No Battery": 2
+    entity_category: config
