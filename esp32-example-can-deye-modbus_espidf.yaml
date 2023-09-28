@@ -136,14 +136,14 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: canStepCounter
+    type: int
+    restore_value: no
+    initial_value: '0'
   - id: next_top_balance_value
     type: int
     restore_value: yes
     initial_value: '0'
-  - id: can_bms_name_update_counter
-    type: int
-    restore_value: no
-    initial_value: '100'
   - id: uart_missing_error
     type: bool
     restore_value: no
@@ -171,7 +171,7 @@ button:
     internal: true
 
 wifi:
-  reboot_timeout: 180min
+  reboot_timeout: 60min
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   #domain: !secret domain
@@ -240,7 +240,7 @@ modbus_controller:
     address: 0x1
     modbus_id: modbus1
     setup_priority: -10
-    update_interval: 5s
+    update_interval: 4s
 
 jk_modbus:
   id: modbus0
@@ -280,363 +280,19 @@ interval:
             - delay: 1ms
             - component.update: source_sensor
             - switch.turn_off: ntc_vcc
-      
+  - interval: 10ms
+    then:
       # Start CAN Handling
       - if:
           condition:
             lambda: |-
-              if (id(bms0).get_states_updated()) {
-                if (id(uart_missing_error)) id(uart_missing_error) = false;
+              if (id(bms0).get_states_updated() && id(canStepCounter) == 0) {
+                id(uart_missing_error) = false;
                 id(no_uart_update_counter) = 0;
                 id(bms0).set_states_updated(false);
-                return false; // TODO
-              } else if (id(no_uart_update_counter)++ >= 50) { // 500 is 500x10ms = 5000ms = 5s
-                id(uart_missing_error) = true;
-                id(no_uart_update_counter) = 40;
-                return true;
-              }
-              return false;
-          then:
-            - canbus.send: # Warning, Alarms
-                can_id: 0x359 # Protection & Alarm flags
-                data: !lambda |-
-                  uint8_t can_mesg[] = {0, 0, 0, 0, 0, 0, 0, 0};
-                  uint16_t jk_errormask = id(errors_bitmask).state;
-                  int batt_mods = ${batt_modules};
-                  // Alarms
-                  if ((jk_errormask & 0x04) | (jk_errormask & 0x80) | (jk_errormask & 0x400)) { // Hight.Voltage.Alarm JK bit 2,7,10 
-                    can_mesg[0] = 0x02; // bit 1
-                  }
-                  if ((jk_errormask & 0x08) | (jk_errormask & 0x800)) { // Low.Voltage.Alarm JK bit 3,11 
-                    can_mesg[0] = can_mesg[0] | 0x04; // bit 2
-                  }
-                  if ((jk_errormask & 0x02) | (jk_errormask & 0x10) | (jk_errormask & 0x100)) { // Hight.Temp.Alarm JK bit 1,4,8
-                    can_mesg[0] = can_mesg[0] | 0x08; // bit 3
-                  }
-                  if (jk_errormask & 0x200) { // Low.Temp.Alarm JK bit 9
-                    can_mesg[0] = can_mesg[0] | 0x10; // bit 4
-                  }
-                  if (jk_errormask & 0x40) { // Discharge.Over.Current JK bit 6
-                    can_mesg[0] = can_mesg[0] | 0x80; // bit 7
-                  }
-                  if (jk_errormask & 0x20) { // Charge.Over.Current JK bit 5
-                    can_mesg[1] = 0x01; // bit 0
-                  }
-                  if ((jk_errormask & 0x1000) | (jk_errormask & 0x2000)) { // BMS Internal JK bit 12,13
-                    can_mesg[1] = can_mesg[1] | 0x08; // bit 3
-                  }
-                  if (jk_errormask & 0x80) { // Cell Imbalance JK bit 7
-                    can_mesg[1] = can_mesg[1] | 0x10; // bit 4 
-                  }
-                  /// Warnings
-                  can_mesg[2] = 0x00;
-                  can_mesg[3] = 0x00;
-                  /// Flags
-                  can_mesg[4] = batt_mods; // Module in parallel
-                  can_mesg[5] = 0x00;
-                  can_mesg[6] = 0x00;
-                  can_mesg[7] = 0x00; // DIP switches 1,3 10000100 0x84
-                  ESP_LOGI("main", "send can id: 0x359 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
-                  return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
-            - delay: 10ms
-
-            - canbus.send: # BMS instructs inverter: Charge Volts, Charge Amps, Discharge Amps, Min voltage
-                can_id: 0x351 # Battery voltage + current limits
-                data: !lambda |-
-                  uint8_t can_mesg[7];
-
-                  if (  !id(charging_switch).state
-                      || !id(inverter_charging).state) 
-                  {
-                    id(charge_status) = "Disabled";
-                    
-                  } else if (id(inverter_top_balance).state) {
-                    
-                    if (id(charge_status) != "Top Balancing") {
-                      id(charge_status) = "Top Balancing";
-                      id(balancing_script).execute();
-                    }
-
-                    if (   id(max_cell_voltage).state < id(balance_starting_voltage).state                                               // max cell is still below balance_starting_voltage
-                        || id(delta_cell_voltage).state > fmax(${balance_delta}, id(balance_opening_pressure_difference).state) + 0.0005 // or delta_cell_voltage > balance_delta
-                        || id(current).state > 2) 			                                                                                 // or current above 5 amps
-                    {
-                      // then restart the balancing_script
-                      if (id(balancing_script).is_running()) id(balancing_script).stop();       
-                      id(balancing_script).execute();
-                    }
-
-                  } else {
-                    id(charge_status) = id(charge_to) + std::to_string(uint16_t(id(max_charge_percent).state)) + "%";
-                  }
-
-                  if (   id(balancing_script).is_running()
-                      && id(charge_status) != "Top Balancing") {
-                    id(balancing_script).stop();
-                  }
-
-                  if (   !id(balancing_script).is_running()
-                      && !id(trigger_timer_for_next_balancing_script).is_running()) {
-                    id(trigger_timer_for_next_balancing_script).execute();
-                  }
-                  
-                  // # set esphome "charging_current" to match with max bms "charging_overcurrent_protection"
-                  if (id(charging_current).state > id(charging_overcurrent_protection).state * 0.975f) {
-                    id(charging_current).publish_state(id(charging_overcurrent_protection).state * 0.975f);
-                  }
-
-                  // # set esphome "discharging_current" to match with max bms "discharging_overcurrent_protection"
-                  if (id(discharging_current).state > id(discharging_overcurrent_protection).state * 0.975f) {
-                    id(discharging_current).publish_state(id(discharging_overcurrent_protection).state * 0.975f);
-                  }
-
-                  // # startCalculuation
-                  id(bms0).initValues(min(id(charging_overcurrent_protection).state * 0.975f, id(charging_current).state),
-                                      min(id(discharging_overcurrent_protection).state * 0.975f, id(discharging_current).state),
-                                      ${min_charge_a},
-                                      ${min_discharge_a});
-
-                  // # cell_voltage_overvoltage
-                  id(bms0).limitChargeCurrent(id(max_cell_voltage).state,
-                                              id(cell_voltage_overvoltage_recovery).state,
-                                              id(cell_voltage_overvoltage_protection).state,
-                                              0.1f,
-                                              "cell_voltage_overvoltage");
-
-                  // # cell_voltage_undervoltage
-                  id(bms0).limitChargeCurrent(id(min_cell_voltage).state,
-                                              id(cell_voltage_undervoltage_recovery).state,
-                                              id(cell_voltage_undervoltage_protection).state,
-                                              0.1f,
-                                              "cell_voltage_undervoltage");
-
-                  // # power_tube_temperature
-                  id(bms0).limitChargeAndDischargeCurrent(id(power_tube_temperature).state,
-                                                          id(power_tube_temperature_recovery).state,
-                                                          id(power_tube_temperature_protection).state,
-                                                          0.1f,
-                                                          "power_tube_temperature",
-                                                          true);
-
-                  float maxBatteryTemperature = max(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
-
-                  // # battery_temperature_sensor_temperature
-                  id(bms0).limitChargeAndDischargeCurrent(maxBatteryTemperature,
-                                                          id(temperature_sensor_temperature_recovery).state,
-                                                          id(temperature_sensor_temperature_protection).state,
-                                                          0.1f,
-                                                          "battery_temperature_sensor_temperature",
-                                                          true);
-
-                  // # battery_charging_high_temperature
-                  id(bms0).limitChargeCurrent(maxBatteryTemperature,
-                                              id(charging_high_temperature_protection).state - 10.0,
-                                              id(charging_high_temperature_protection).state,
-                                              0.1f,
-                                              "battery_charging_high_temperature",
-                                              true);
-
-                  // # battery_discharging_high_temperature
-                  id(bms0).limitDischargeCurrent(maxBatteryTemperature,
-                                                 id(discharging_high_temperature_protection).state - 10.0,
-                                                 id(discharging_high_temperature_protection).state,
-                                                 0.1f,
-                                                 "battery_discharging_high_temperature",
-                                                 true);
-
-                  float minBatteryTemperature = min(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
-
-                  // # battery_charging_low_temperature
-                  id(bms0).limitChargeCurrent(minBatteryTemperature,
-                                              id(charging_low_temperature_recovery).state,
-                                              id(charging_low_temperature_protection).state,
-                                              0.1f,
-                                              "battery_charging_low_temperature");
-
-                  // # battery_discharging_low_temperature
-                  id(bms0).limitDischargeCurrent(minBatteryTemperature,
-                                                 id(discharging_low_temperature_recovery).state,
-                                                 id(discharging_low_temperature_protection).state,
-                                                 0.1f,
-                                                 "battery_discharging_low_temperature");
-
-                  // # wire_temperature
-                  if (${use_wire_temperature_sensor}) {
-                    id(bms0).limitChargeAndDischargeCurrent(id(temperature_wire).state,
-                                                            ${temperature_wire_recovery},
-                                                            ${temperature_wire_protection},
-                                                            0.0f,
-                                                            "wire_temperature",
-                                                            true);
-                  }
-                  
-                  id(bms0).setRampups(1.0f);
-
-                  float charge_volt = id(balance_voltage).state;
-                  float charge_amp = 0;
-                  float discharge_volt = id(min_dischange_voltage).state;
-                  float discharge_amp = 0;
-                  
-                  if (id(uart_missing_error)) {
-                    id(charge_status) = "Disabled";
-                    id(chargingAllowed) = false;
-                    id(dischargingAllowed) = false;
-                  } else {
-
-                    if (   id(charging_switch).state 
-                        && id(inverter_charging).state
-                        && (   id(charge_status).substr(0, id(charge_to).length()) == id(charge_to)
-                            || id(charge_status) == "Top Balancing") 				     // Overides to disable charging
-                       )
-                    {
-                      if (id(capacity_remaining).state < id(max_charge_percent).state || id(charge_status) == "Top Balancing") {
-                        id(chargingAllowed) = true;
-                      } else if (id(capacity_remaining).state > id(max_charge_percent).state) {
-                        id(chargingAllowed) = false;
-                      } else {
-                        // id(capacity_remaining).state = id(max_charge_percent).state
-                        // leave the value of id(chargingAllowed) as it is
-                      }
-                    } else {
-                      id(chargingAllowed) = false;
-                    }
-                    
-                    if (id(discharging_switch).state && id(inverter_discharging).state) {
-
-                      if (id(capacity_remaining).state < id(min_discharge_percent).state) {
-                        id(dischargingAllowed) = false;
-                      } else if (id(capacity_remaining).state > id(min_discharge_percent).state) {
-                        id(dischargingAllowed) = true;
-                      } else {
-                        // id(capacity_remaining).state = id(min_discharge_percent).state
-                        // leave the value of id(dischargingAllowed) as it is
-                      }
-                    } else {
-                      id(dischargingAllowed) = false;
-                    }
-
-                    if (id(chargingAllowed)) {
-                      charge_amp = id(bms0).getLimitedChargeCurrent();
-                    }
-                    if (id(dischargingAllowed)) {
-                      discharge_amp = id(bms0).getLimitedDischargeCurrent();
-                    }
-                  }
-
-                  can_mesg[0] = uint16_t(charge_volt * 10) & 0xff;
-                  can_mesg[1] = uint16_t(charge_volt * 10) >> 8 & 0xff;
-                  can_mesg[2] = uint16_t(charge_amp * 10) & 0xff;
-                  can_mesg[3] = uint16_t(charge_amp * 10) >> 8 & 0xff;
-                  can_mesg[4] = uint16_t(discharge_amp * 10) & 0xff;
-                  can_mesg[5] = uint16_t(discharge_amp * 10) >> 8 & 0xff;
-                  can_mesg[6] = uint16_t(discharge_volt * 10) & 0xff;
-                  can_mesg[7] = uint16_t(discharge_volt * 10) >> 8 & 0xff;
-                  
-                  if (id(send_inverter_charge_voltage).state    != uint16_t(charge_volt * 10) / 10.0)    id(send_inverter_charge_voltage).publish_state(uint16_t(charge_volt * 10) / 10.0);
-                  if (id(send_inverter_charge_current).state    != uint16_t(charge_amp * 10) / 10.0)     id(send_inverter_charge_current).publish_state(uint16_t(charge_amp * 10) / 10.0);
-                  if (id(send_inverter_discharge_current).state != uint16_t(discharge_amp * 10) / 10.0)  id(send_inverter_discharge_current).publish_state(uint16_t(discharge_amp * 10) / 10.0);
-                  if (id(send_inverter_discharge_voltage).state != uint16_t(discharge_volt * 10) / 10.0) id(send_inverter_discharge_voltage).publish_state(uint16_t(discharge_volt * 10) / 10.0);
-
-                  if (id(limited_charge_current_reason).state != id(bms0).getLimitedChargeCurrentReason()) id(limited_charge_current_reason).publish_state(id(bms0).getLimitedChargeCurrentReason());
-                  if (id(limited_discharge_current_reason).state != id(bms0).getLimitedDischargeCurrentReason()) id(limited_discharge_current_reason).publish_state(id(bms0).getLimitedDischargeCurrentReason());
-
-                  if (id(charging_status).state != id(charge_status)) {
-                    id(charging_status).publish_state(id(charge_status));
-                  }
-
-                  ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(min_dischange_voltage).state * 10) / 10.0f);
-
-                  ESP_LOGI("main", "send can id: 0x351 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
-                  ESP_LOGI("main", "send can id: Charge Status %s", id(charge_status).c_str());
-                  return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
-            - delay: 10ms
-
-            - canbus.send: # Actual SOC, SOH
-                can_id: 0x355 # State of Health (SOH) / State of Charge (SOC)
-                data: !lambda |-
-                  int soh = round(((id(charging_cycles).state/${max_cycles})-1)*-100);
-                  uint8_t can_mesg[3];
-                  can_mesg[0] = uint16_t(id(capacity_remaining).state) & 0xff;
-                  can_mesg[1] = uint16_t(id(capacity_remaining).state) >> 8 & 0xff;
-                  can_mesg[2] = soh & 0xff;
-                  can_mesg[3] = soh >> 8 & 0xff;
-                  ESP_LOGI("main", "send can id: 0x355 hex: %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3]);
-                  return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3]};
-            - delay: 10ms
-
-            - canbus.send: # Actual Volts, Amps, Temp
-                can_id: 0x356 # Voltage / Current / Temperature
-                data: !lambda |-
-                  uint8_t can_mesg[5];
-                  can_mesg[0] = uint16_t(id(total_voltage).state * 100) & 0xff;
-                  can_mesg[1] = uint16_t(id(total_voltage).state * 100) >> 8 & 0xff;
-                  can_mesg[2] = int16_t(id(current).state * 10) & 0xff;
-                  can_mesg[3] = int16_t(id(current).state * 10) >> 8 & 0xff;
-                  can_mesg[4] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) & 0xff;
-                  can_mesg[5] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) >> 8 & 0xff;
-                  ESP_LOGI("main", "send can id: 0x356 hex: %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5]);
-                  return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5]};
-            - delay: 10ms
-
-            - canbus.send: # Request flag to Enable/Disable: Charge, Discharge
-                can_id: 0x35C   # Battery charge request flags
-                data: !lambda |-
-                  uint8_t can_mesg[1];
-
-                  if (id(uart_missing_error)) {
-                    can_mesg[0] = 0x00;
-                    can_mesg[1] = 0x00;
-                  } else {
-                    //if (id(charging_switch).state && id(inverter_charging).state) {
-                    if (id(charging_switch).state) {
-                      can_mesg[0] = 0x80;
-                    } else {
-                      can_mesg[0] = 0x00;
-                    }
-                    //if (id(discharging_switch).state && id(inverter_discharging).state) {
-                    if (id(discharging_switch).state) {
-                      can_mesg[0] = can_mesg[0] | 0x40;
-                    }
-                    can_mesg[1] = 0x00;
-                  }
-                  ESP_LOGI("main", "send can id: 0x35C hex: %x %x", can_mesg[0], can_mesg[1]);
-                  return {can_mesg[0], can_mesg[1]};
-            - delay: 10ms
-
-            - canbus.send: # Actual Max Cell Temp, Min Cell Temp, Max Cell V, Min Cell V
-                can_id: 0x70
-                data: !lambda |-
-                  int max_cell_voltage_i = id(max_cell_voltage).state * 100.0;
-                  int min_cell_voltage_i = id(min_cell_voltage).state * 100.0;
-                  uint8_t can_mesg[7];
-                  can_mesg[0] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) & 0xff;
-                  can_mesg[1] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) >> 8 & 0xff;
-                  can_mesg[2] = int16_t(min(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) & 0xff;
-                  can_mesg[3] = int16_t(min(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) >> 8 & 0xff;
-                  can_mesg[4] = max_cell_voltage_i & 0xff;
-                  can_mesg[5] = max_cell_voltage_i >> 8 & 0xff;
-                  can_mesg[6] = min_cell_voltage_i & 0xff;
-                  can_mesg[7] = min_cell_voltage_i >> 8 & 0xff;
-                  ESP_LOGI("main", "send can id: 0x70 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
-                  return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
-            - delay: 10ms
-
-            - canbus.send: # Actual Max Cell Temp ID, Min Cell Temp ID, Max Cell V ID, Min Cell ID
-                can_id: 0x371
-                data: !lambda |-
-                  uint8_t can_mesg[7];
-                  can_mesg[0] = 0x01;
-                  can_mesg[1] = 0x00;
-                  can_mesg[2] = 0x02;
-                  can_mesg[3] = 0x00;
-                  can_mesg[4] = uint16_t(id(max_voltage_cell).state) & 0xff;
-                  can_mesg[5] = uint16_t(id(max_voltage_cell).state) >> 8 & 0xff;
-                  can_mesg[6] = uint16_t(id(min_voltage_cell).state) & 0xff;
-                  can_mesg[7] = uint16_t(id(min_voltage_cell).state) >> 8 & 0xff;
-                  ESP_LOGI("main", "send can id: 0x371 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
-                  return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
-            
-            - lambda: |- # Detect no CAN reply
+                //id(canStepCounter) = 1;
+                return false;
+              } else if (id(canStepCounter) != 0) {
                 if (id(can_305_rx) > 30) {
                   ESP_LOGI("main", "No rx can 0x305 reply, Inverter not connected/responding, Rebooting...");
                   //id(restart_button).press(); # TODO uncomment
@@ -645,21 +301,390 @@ interval:
                   id(can_305_rx) ++;
                 }
 
+                id(canStepCounter)++;
+                return false;
+
+              } else if (id(no_uart_update_counter)++ >= 500) { // 500 is 500x10ms = 5000ms = 5s
+                id(uart_missing_error) = true;
+                id(no_uart_update_counter) = 400;
+                id(canStepCounter) = 1;
+                return true;
+              }
+              return false;
+          then:
             - if:
                 condition:
                   lambda: |-
-                    if (id(can_bms_name_update_counter)++ >= 100) {
-                      id(can_bms_name_update_counter) = 0; // send every 10 seconds
-                      return true;
-                    }
-                    return false;
+                    return id(canStepCounter) == 1;
                 then:
-                  - delay: 10ms
+                  canbus.send: # Warning, Alarms
+                    can_id: 0x359 # Protection & Alarm flags
+                    data: !lambda |-
+                      uint8_t can_mesg[] = {0, 0, 0, 0, 0, 0, 0, 0};
+                      uint16_t jk_errormask = id(errors_bitmask).state;
+                      int batt_mods = ${batt_modules};
+                      // Alarms
+                      if ((jk_errormask & 0x04) || (jk_errormask & 0x80) || (jk_errormask & 0x400)) { // Hight.Voltage.Alarm JK bit 2,7,10 
+                        can_mesg[0] = 0x02; // bit 1
+                      }
+                      if ((jk_errormask & 0x08) || (jk_errormask & 0x800)) { // Low.Voltage.Alarm JK bit 3,11 
+                        can_mesg[0] = can_mesg[0] | 0x04; // bit 2
+                      }
+                      if ((jk_errormask & 0x02) || (jk_errormask & 0x10) || (jk_errormask & 0x100)) { // Hight.Temp.Alarm JK bit 1,4,8
+                        can_mesg[0] = can_mesg[0] | 0x08; // bit 3
+                      }
+                      if (jk_errormask & 0x200) { // Low.Temp.Alarm JK bit 9
+                        can_mesg[0] = can_mesg[0] | 0x10; // bit 4
+                      }
+                      if (jk_errormask & 0x40) { // Discharge.Over.Current JK bit 6
+                        can_mesg[0] = can_mesg[0] | 0x80; // bit 7
+                      }
+                      if (jk_errormask & 0x20) { // Charge.Over.Current JK bit 5
+                        can_mesg[1] = 0x01; // bit 0
+                      }
+                      if ((jk_errormask & 0x1000) || (jk_errormask & 0x2000)) { // BMS Internal JK bit 12,13
+                        can_mesg[1] = can_mesg[1] | 0x08; // bit 3
+                      }
+                      if (jk_errormask & 0x80) { // Cell Imbalance JK bit 7
+                        can_mesg[1] = can_mesg[1] | 0x10; // bit 4 
+                      }
+                      /// Warnings
+                      can_mesg[2] = 0x00;
+                      can_mesg[3] = 0x00;
+                      /// Flags
+                      can_mesg[4] = batt_mods; // Module in parallel
+                      can_mesg[5] = 0x00;
+                      can_mesg[6] = 0x00;
+                      can_mesg[7] = 0x00; // DIP switches 1,3 10000100 0x84
+                      ESP_LOGI("main", "send can id: 0x359 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
+                      return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
+            - if:
+                condition:
+                  lambda: |-
+                    return id(canStepCounter) == 2;
+                then:
+                  canbus.send: # BMS instructs inverter: Charge Volts, Charge Amps, Discharge Amps, Min voltage
+                    can_id: 0x351 # Battery voltage + current limits
+                    data: !lambda |-
+                      uint8_t can_mesg[7];
+
+                      if (  !id(charging_switch).state
+                          || !id(inverter_charging).state) 
+                      {
+                        id(charge_status) = "Disabled";
+                        
+                      } else if (id(inverter_top_balance).state) {
+                        
+                        if (id(charge_status) != "Top Balancing") {
+                          id(charge_status) = "Top Balancing";
+                          id(balancing_script).execute();
+                        }
+
+                        if (   id(max_cell_voltage).state < id(balance_starting_voltage).state                                               // max cell is still below balance_starting_voltage
+                            || id(delta_cell_voltage).state > fmax(${balance_delta}, id(balance_opening_pressure_difference).state) + 0.0005 // or delta_cell_voltage > balance_delta
+                            || id(current).state > 2) 			                                                                                 // or current above 5 amps
+                        {
+                          // then restart the balancing_script
+                          if (id(balancing_script).is_running()) id(balancing_script).stop();       
+                          id(balancing_script).execute();
+                        }
+
+                      } else {
+                        id(charge_status) = id(charge_to) + std::to_string(uint16_t(id(max_charge_percent).state)) + "%";
+                      }
+
+                      if (   id(balancing_script).is_running()
+                          && id(charge_status) != "Top Balancing") {
+                        id(balancing_script).stop();
+                      }
+
+                      if (   !id(balancing_script).is_running()
+                          && !id(trigger_timer_for_next_balancing_script).is_running()) {
+                        id(trigger_timer_for_next_balancing_script).execute();
+                      }
+                      
+                      // # set esphome "charging_current" to match with max bms "charging_overcurrent_protection"
+                      if (id(charging_current).state > id(charging_overcurrent_protection).state * 0.975f) {
+                        id(charging_current).publish_state(id(charging_overcurrent_protection).state * 0.975f);
+                      }
+
+                      // # set esphome "discharging_current" to match with max bms "discharging_overcurrent_protection"
+                      if (id(discharging_current).state > id(discharging_overcurrent_protection).state * 0.975f) {
+                        id(discharging_current).publish_state(id(discharging_overcurrent_protection).state * 0.975f);
+                      }
+
+                      // # startCalculuation
+                      id(bms0).initValues(min(id(charging_overcurrent_protection).state * 0.975f, id(charging_current).state),
+                                          min(id(discharging_overcurrent_protection).state * 0.975f, id(discharging_current).state),
+                                          ${min_charge_a},
+                                          ${min_discharge_a});
+
+                      // # cell_voltage_overvoltage
+                      id(bms0).limitChargeCurrent(id(max_cell_voltage).state,
+                                                  id(cell_voltage_overvoltage_recovery).state,
+                                                  id(cell_voltage_overvoltage_protection).state,
+                                                  0.1f,
+                                                  "cell_voltage_overvoltage");
+
+                      // # cell_voltage_undervoltage
+                      id(bms0).limitChargeCurrent(id(min_cell_voltage).state,
+                                                  id(cell_voltage_undervoltage_recovery).state,
+                                                  id(cell_voltage_undervoltage_protection).state,
+                                                  0.1f,
+                                                  "cell_voltage_undervoltage");
+
+                      // # power_tube_temperature
+                      id(bms0).limitChargeAndDischargeCurrent(id(power_tube_temperature).state,
+                                                              id(power_tube_temperature_recovery).state,
+                                                              id(power_tube_temperature_protection).state,
+                                                              0.1f,
+                                                              "power_tube_temperature",
+                                                              true);
+
+                      float maxBatteryTemperature = max(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
+
+                      // # battery_temperature_sensor_temperature
+                      id(bms0).limitChargeAndDischargeCurrent(maxBatteryTemperature,
+                                                              id(temperature_sensor_temperature_recovery).state,
+                                                              id(temperature_sensor_temperature_protection).state,
+                                                              0.1f,
+                                                              "battery_temperature_sensor_temperature",
+                                                              true);
+
+                      // # battery_charging_high_temperature
+                      id(bms0).limitChargeCurrent(maxBatteryTemperature,
+                                                  id(charging_high_temperature_protection).state - 10.0,
+                                                  id(charging_high_temperature_protection).state,
+                                                  0.1f,
+                                                  "battery_charging_high_temperature",
+                                                  true);
+
+                      // # battery_discharging_high_temperature
+                      id(bms0).limitDischargeCurrent(maxBatteryTemperature,
+                                                    id(discharging_high_temperature_protection).state - 10.0,
+                                                    id(discharging_high_temperature_protection).state,
+                                                    0.1f,
+                                                    "battery_discharging_high_temperature",
+                                                    true);
+
+                      float minBatteryTemperature = min(id(temperature_sensor_1).state, id(temperature_sensor_2).state);
+
+                      // # battery_charging_low_temperature
+                      id(bms0).limitChargeCurrent(minBatteryTemperature,
+                                                  id(charging_low_temperature_recovery).state,
+                                                  id(charging_low_temperature_protection).state,
+                                                  0.1f,
+                                                  "battery_charging_low_temperature");
+
+                      // # battery_discharging_low_temperature
+                      id(bms0).limitDischargeCurrent(minBatteryTemperature,
+                                                    id(discharging_low_temperature_recovery).state,
+                                                    id(discharging_low_temperature_protection).state,
+                                                    0.1f,
+                                                    "battery_discharging_low_temperature");
+
+                      // # wire_temperature
+                      if (${use_wire_temperature_sensor}) {
+                        id(bms0).limitChargeAndDischargeCurrent(id(temperature_wire).state,
+                                                                ${temperature_wire_recovery},
+                                                                ${temperature_wire_protection},
+                                                                0.0f,
+                                                                "wire_temperature",
+                                                                true);
+                      }
+                      
+                      id(bms0).setRampups(1.0f);
+
+                      float charge_volt = id(balance_voltage).state;
+                      float charge_amp = 0;
+                      float discharge_volt = id(min_dischange_voltage).state;
+                      float discharge_amp = 0;
+                      
+                      if (id(uart_missing_error)) {
+                        id(charge_status) = "Disabled";
+                        id(chargingAllowed) = false;
+                        id(dischargingAllowed) = false;
+                      } else {
+
+                        if (   id(charging_switch).state 
+                            && id(inverter_charging).state
+                            && (   id(charge_status).substr(0, id(charge_to).length()) == id(charge_to)
+                                || id(charge_status) == "Top Balancing") 				     // Overides to disable charging
+                          )
+                        {
+                          if (id(capacity_remaining).state < id(max_charge_percent).state || id(charge_status) == "Top Balancing") {
+                            id(chargingAllowed) = true;
+                          } else if (id(capacity_remaining).state > id(max_charge_percent).state) {
+                            id(chargingAllowed) = false;
+                          } else {
+                            // id(capacity_remaining).state = id(max_charge_percent).state
+                            // leave the value of id(chargingAllowed) as it is
+                          }
+                        } else {
+                          id(chargingAllowed) = false;
+                        }
+                        
+                        if (id(discharging_switch).state && id(inverter_discharging).state) {
+
+                          if (id(capacity_remaining).state < id(min_discharge_percent).state) {
+                            id(dischargingAllowed) = false;
+                          } else if (id(capacity_remaining).state > id(min_discharge_percent).state) {
+                            id(dischargingAllowed) = true;
+                          } else {
+                            // id(capacity_remaining).state = id(min_discharge_percent).state
+                            // leave the value of id(dischargingAllowed) as it is
+                          }
+                        } else {
+                          id(dischargingAllowed) = false;
+                        }
+
+                        if (id(chargingAllowed)) {
+                          charge_amp = id(bms0).getLimitedChargeCurrent();
+                        }
+                        if (id(dischargingAllowed)) {
+                          discharge_amp = id(bms0).getLimitedDischargeCurrent();
+                        }
+                      }
+
+                      can_mesg[0] = uint16_t(charge_volt * 10) & 0xff;
+                      can_mesg[1] = uint16_t(charge_volt * 10) >> 8 & 0xff;
+                      can_mesg[2] = uint16_t(charge_amp * 10) & 0xff;
+                      can_mesg[3] = uint16_t(charge_amp * 10) >> 8 & 0xff;
+                      can_mesg[4] = uint16_t(discharge_amp * 10) & 0xff;
+                      can_mesg[5] = uint16_t(discharge_amp * 10) >> 8 & 0xff;
+                      can_mesg[6] = uint16_t(discharge_volt * 10) & 0xff;
+                      can_mesg[7] = uint16_t(discharge_volt * 10) >> 8 & 0xff;
+                      
+                      if (id(send_inverter_charge_voltage).state    != uint16_t(charge_volt * 10) / 10.0)    id(send_inverter_charge_voltage).publish_state(uint16_t(charge_volt * 10) / 10.0);
+                      if (id(send_inverter_charge_current).state    != uint16_t(charge_amp * 10) / 10.0)     id(send_inverter_charge_current).publish_state(uint16_t(charge_amp * 10) / 10.0);
+                      if (id(send_inverter_discharge_current).state != uint16_t(discharge_amp * 10) / 10.0)  id(send_inverter_discharge_current).publish_state(uint16_t(discharge_amp * 10) / 10.0);
+                      if (id(send_inverter_discharge_voltage).state != uint16_t(discharge_volt * 10) / 10.0) id(send_inverter_discharge_voltage).publish_state(uint16_t(discharge_volt * 10) / 10.0);
+
+                      if (id(limited_charge_current_reason).state != id(bms0).getLimitedChargeCurrentReason()) id(limited_charge_current_reason).publish_state(id(bms0).getLimitedChargeCurrentReason());
+                      if (id(limited_discharge_current_reason).state != id(bms0).getLimitedDischargeCurrentReason()) id(limited_discharge_current_reason).publish_state(id(bms0).getLimitedDischargeCurrentReason());
+
+                      if (id(charging_status).state != id(charge_status)) {
+                        id(charging_status).publish_state(id(charge_status));
+                      }
+
+                      ESP_LOGI("main", "min_dischange_voltage %.1f", int16_t(id(min_dischange_voltage).state * 10) / 10.0f);
+
+                      ESP_LOGI("main", "send can id: 0x351 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
+                      ESP_LOGI("main", "send can id: Charge Status %s", id(charge_status).c_str());
+                      return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
+            - if:
+                condition:
+                  lambda: |-
+                    return id(canStepCounter) == 3;
+                then:
+                  canbus.send: # Actual SOC, SOH
+                    can_id: 0x355 # State of Health (SOH) / State of Charge (SOC)
+                    data: !lambda |-
+                      int soh = round(((id(charging_cycles).state/${max_cycles})-1)*-100);
+                      uint8_t can_mesg[3];
+                      can_mesg[0] = uint16_t(id(capacity_remaining).state) & 0xff;
+                      can_mesg[1] = uint16_t(id(capacity_remaining).state) >> 8 & 0xff;
+                      can_mesg[2] = soh & 0xff;
+                      can_mesg[3] = soh >> 8 & 0xff;
+                      ESP_LOGI("main", "send can id: 0x355 hex: %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3]);
+                      return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3]};
+            - if:
+                condition:
+                  lambda: |-
+                    return id(canStepCounter) == 4;
+                then:
+                  canbus.send: # Actual Volts, Amps, Temp
+                    can_id: 0x356 # Voltage / Current / Temperature
+                    data: !lambda |-
+                      uint8_t can_mesg[5];
+                      can_mesg[0] = uint16_t(id(total_voltage).state * 100) & 0xff;
+                      can_mesg[1] = uint16_t(id(total_voltage).state * 100) >> 8 & 0xff;
+                      can_mesg[2] = int16_t(id(current).state * 10) & 0xff;
+                      can_mesg[3] = int16_t(id(current).state * 10) >> 8 & 0xff;
+                      can_mesg[4] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) & 0xff;
+                      can_mesg[5] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) >> 8 & 0xff;
+                      ESP_LOGI("main", "send can id: 0x356 hex: %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5]);
+                      return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5]};
+            - if:
+                condition:
+                  lambda: |-
+                    return id(canStepCounter) == 5;
+                then:
+                  canbus.send: # Request flag to Enable/Disable: Charge, Discharge
+                    can_id: 0x35C   # Battery charge request flags
+                    data: !lambda |-
+                      uint8_t can_mesg[1];
+
+                      if (id(uart_missing_error)) {
+                        can_mesg[0] = 0x00;
+                        can_mesg[1] = 0x00;
+                      } else {
+                        //if (id(charging_switch).state && id(inverter_charging).state) {
+                        if (id(charging_switch).state) {
+                          can_mesg[0] = 0x80;
+                        } else {
+                          can_mesg[0] = 0x00;
+                        }
+                        //if (id(discharging_switch).state && id(inverter_discharging).state) {
+                        if (id(discharging_switch).state) {
+                          can_mesg[0] = can_mesg[0] | 0x40;
+                        }
+                        can_mesg[1] = 0x00;
+                      }
+                      ESP_LOGI("main", "send can id: 0x35C hex: %x %x", can_mesg[0], can_mesg[1]);
+                      return {can_mesg[0], can_mesg[1]};
+            - if:
+                condition:
+                  lambda: |-
+                    return id(canStepCounter) == 6;
+                then:
+                  canbus.send: # Actual Max Cell Temp, Min Cell Temp, Max Cell V, Min Cell V
+                    can_id: 0x70
+                    data: !lambda |-
+                      int max_cell_voltage_i = id(max_cell_voltage).state * 100.0;
+                      int min_cell_voltage_i = id(min_cell_voltage).state * 100.0;
+                      uint8_t can_mesg[7];
+                      can_mesg[0] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) & 0xff;
+                      can_mesg[1] = int16_t(max(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) >> 8 & 0xff;
+                      can_mesg[2] = int16_t(min(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) & 0xff;
+                      can_mesg[3] = int16_t(min(id(temperature_sensor_1).state, id(temperature_sensor_2).state)* 10) >> 8 & 0xff;
+                      can_mesg[4] = max_cell_voltage_i & 0xff;
+                      can_mesg[5] = max_cell_voltage_i >> 8 & 0xff;
+                      can_mesg[6] = min_cell_voltage_i & 0xff;
+                      can_mesg[7] = min_cell_voltage_i >> 8 & 0xff;
+                      ESP_LOGI("main", "send can id: 0x70 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
+                      return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
+            - if:
+                condition:
+                  lambda: |-
+                    return id(canStepCounter) == 7;
+                then:
+                  - canbus.send: # Actual Max Cell Temp ID, Min Cell Temp ID, Max Cell V ID, Min Cell ID
+                      can_id: 0x371
+                      data: !lambda |-
+                        uint8_t can_mesg[7];
+                        can_mesg[0] = 0x01;
+                        can_mesg[1] = 0x00;
+                        can_mesg[2] = 0x02;
+                        can_mesg[3] = 0x00;
+                        can_mesg[4] = uint16_t(id(max_voltage_cell).state) & 0xff;
+                        can_mesg[5] = uint16_t(id(max_voltage_cell).state) >> 8 & 0xff;
+                        can_mesg[6] = uint16_t(id(min_voltage_cell).state) & 0xff;
+                        can_mesg[7] = uint16_t(id(min_voltage_cell).state) >> 8 & 0xff;
+                        ESP_LOGI("main", "send can id: 0x371 hex: %x %x %x %x %x %x %x %x", can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]);
+                        return {can_mesg[0], can_mesg[1], can_mesg[2], can_mesg[3], can_mesg[4], can_mesg[5], can_mesg[6], can_mesg[7]};
+            - if:
+                condition:
+                  lambda: |-
+                    return id(canStepCounter) == 8;
+                then:
                   - canbus.send:
                       can_id: 0x35E # Manufacturer name ("GOODWE")
                       #data: [0x47, 0x4F, 0x4F, 0x44, 0x57, 0x45, 0x20, 0x20] # "GOODWE"
                       #data: [0x50, 0x59, 0x4C, 0x4F, 0x4E, 0x20, 0x20, 0x20] # "PYLON"
                       data: [0X4A, 0X4B, 0x20, 0x42, 0x4D, 0x53, 0x20, 0x20] # "JK BMS"
+                  - lambda: |- # Detect no CAN reply
+                      id(canStepCounter) = 0;
 
 binary_sensor:
   - platform: jk_bms
@@ -684,7 +709,7 @@ binary_sensor:
   # Modbus to DEYE Inverter
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
+  #   skip_updates: 5
   #   name: "${deye_name} AC INV Relay" # bit 0
   #   id: deye_AC_INV_relay
   #   register_type: holding
@@ -693,7 +718,7 @@ binary_sensor:
  
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
+  #   skip_updates: 5
   #   name: "${deye_name} AC Load Relay Reserved" # bit 1
   #   id: deye_AC_Load_relay_Reserved
   #   register_type: holding
@@ -702,7 +727,7 @@ binary_sensor:
  
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
+  #   skip_updates: 5
   #   name: "${deye_name} AC Grid Relay" # bit 2
   #   id: deye_AC_grid_relay
   #   register_type: holding
@@ -711,7 +736,7 @@ binary_sensor:
  
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
+  #   skip_updates: 5
   #   name: "${deye_name} AC Generator Relay" # bit 3
   #   id: deye_AC_Generator_relay
   #   register_type: holding
@@ -720,7 +745,7 @@ binary_sensor:
  
   # - platform: modbus_controller
   #   modbus_controller_id: modbus_deye
-  #   skip_updates: 2
+  #   skip_updates: 5
   #   name: "${deye_name} Turn Off/On Status"
   #   id: deye_Turn_off_on_status
   #   register_type: holding
@@ -997,26 +1022,26 @@ sensor:
         
 
   - platform: template
-    name: "Send inverter charge voltage"
+    name: "Send Inverter Charge Voltage"
     id: send_inverter_charge_voltage
     device_class: "voltage"
     unit_of_measurement: V
     state_class: "measurement"
   - platform: template
-    name: "Send inverter charge current"
+    name: "Send Inverter Charge Current"
     id: send_inverter_charge_current
     device_class: "current"
     unit_of_measurement: A
     state_class: "measurement"
     icon: mdi:current-dc
   - platform: template
-    name: "Send inverter discharge voltage"
+    name: "Send Inverter Discharge Voltage"
     id: send_inverter_discharge_voltage
     device_class: "voltage"
     unit_of_measurement: V
     state_class: "measurement"
   - platform: template
-    name: "Send inverter discharge current"
+    name: "Send Inverter Discharge Current"
     id: send_inverter_discharge_current
     device_class: "current"
     unit_of_measurement: A
@@ -1026,6 +1051,7 @@ sensor:
   # Modbus to DEYE Inverter
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
+    # skip_updates: 5
     name: "${deye_name} Heat Sink Temperature"
     id: deye_heat_sink_temeratur
     register_type: holding
@@ -1139,7 +1165,7 @@ sensor:
 
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily Load Consumption"
     id: deye_Daily_Load_Consumption
     icon: mdi:home-lightning-bolt
@@ -1155,7 +1181,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily Production"
     id: deye_Daily_Production
     icon: mdi:solar-power
@@ -1171,7 +1197,7 @@ sensor:
 
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily PV1 Production"
     id: deye_Daily_PV1_Production
     icon: mdi:solar-power
@@ -1187,7 +1213,7 @@ sensor:
   
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily PV2 Production"
     id: deye_Daily_PV2_Production
     icon: mdi:solar-power
@@ -1203,7 +1229,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Total PV Production"
     id: deye_Total_PV_Production
     register_type: holding
@@ -1229,7 +1255,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily Energy Bought"
     id: deye_Daily_Energy_Bought
     icon: mdi:transmission-tower-export
@@ -1245,7 +1271,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily Energy Sold"
     id: deye_Daily_Energy_Sold
     icon: mdi:transmission-tower-import
@@ -1261,7 +1287,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Total Energy Bought"
     id: deye_Total_Energy_Bought
     register_type: holding
@@ -1276,7 +1302,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Total Energy Sold"
     id: deye_Total_Energy_Sold
     register_type: holding
@@ -1291,7 +1317,7 @@ sensor:
 
   - platform: modbus_controller #Total Consumption
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Total Consumption"
     id: deye_Total_Consumption
     register_type: holding
@@ -1306,7 +1332,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Power Generation Today"
     id: deye_power_generation_today
     register_type: holding
@@ -1321,7 +1347,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 5
     name: "${deye_name} Grid Current L1"
     id: deye_Grid_Current_L1
     register_type: holding
@@ -1335,7 +1361,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 5
     name: "${deye_name} Grid Current L2"
     id: deye_Grid_Current_L2
     register_type: holding
@@ -1349,7 +1375,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 5
     name: "${deye_name} Grid Current L3"
     id: deye_Grid_Current_L3
     register_type: holding
@@ -1363,7 +1389,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Grid Voltage L1"
     id: deye_Grid_Voltage_L1
     register_type: holding
@@ -1377,7 +1403,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Grid Voltage L2"
     id: deye_Grid_Voltage_L2
     register_type: holding
@@ -1391,7 +1417,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Grid Voltage L3"
     id: deye_Grid_Voltage_L3
     register_type: holding
@@ -1401,12 +1427,11 @@ sensor:
     accuracy_decimals: 1
     filters:
       - multiply: 0.1
-    value_type: U_WORD  
+    value_type: U_WORD
 
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    # skip_updates: 2
     name: "${deye_name} Internal CT L1 Power"
     id: deye_Internal_CT_L1_Power
     register_type: holding
@@ -1418,7 +1443,6 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    # skip_updates: 2
     name: "${deye_name} Internal CT L2 Power"
     id: deye_Internal_CT_L2_Power
     register_type: holding
@@ -1430,7 +1454,6 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    # skip_updates: 2
     name: "${deye_name} Internal CT L3 Power"
     id: deye_Internal_CT_L3_Power
     register_type: holding
@@ -1442,7 +1465,6 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    # skip_updates: 2
     name: "${deye_name} Internal Total Power"
     id: deye_Internal_total_Power
     register_type: holding
@@ -1454,7 +1476,6 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    # skip_updates: 2
     name: "${deye_name} External CT L1 Power"
     id: deye_External_CT_L1_Power
     register_type: holding
@@ -1466,7 +1487,6 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    # skip_updates: 2
     name: "${deye_name} External CT L2 Power"
     id: deye_External_CT_L2_Power
     register_type: holding
@@ -1478,7 +1498,6 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    # skip_updates: 2
     name: "${deye_name} External CT L3 Power"
     id: deye_External_CT_L3_Power
     register_type: holding
@@ -1486,7 +1505,7 @@ sensor:
     unit_of_measurement: "W"
     state_class: "measurement"
     accuracy_decimals: 0
-    value_type: S_WORD     
+    value_type: S_WORD
  
   - platform: modbus_controller  
     modbus_controller_id: modbus_deye
@@ -1498,7 +1517,40 @@ sensor:
     state_class: "measurement"
     accuracy_decimals: 0
     value_type: S_WORD
-    
+
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    name: "${deye_name} Load L1 Power"
+    id: deye_Load_L1_Power
+    register_type: holding
+    address: 650
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD  
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    name: "${deye_name} Load L2 Power"
+    id: deye_Load_L2_Power
+    register_type: holding
+    address: 651
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD  
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    name: "${deye_name} Load L3 Power"
+    id: deye_Load_L3_Power
+    register_type: holding
+    address: 652
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD
+
   - platform: modbus_controller # Load totalpower
     modbus_controller_id: modbus_deye
     name: "${deye_name} Load Total Power" 
@@ -1509,10 +1561,54 @@ sensor:
     state_class: "measurement"
     accuracy_decimals: 0
     value_type: S_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    name: "${deye_name} Gen L1 Power"
+    id: deye_Gen_L1_Power
+    register_type: holding
+    address: 664
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD  
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    name: "${deye_name} Gen L2 Power"
+    id: deye_Gen_L2_Power
+    register_type: holding
+    address: 665
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD  
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    name: "${deye_name} Gen L3 Power"
+    id: deye_Gen_L3_Power
+    register_type: holding
+    address: 666
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD
+
+  - platform: modbus_controller # Gen totalpower
+    modbus_controller_id: modbus_deye
+    name: "${deye_name} Gen Total Power" 
+    id: deye_Gen_total_power
+    register_type: holding
+    address: 667
+    unit_of_measurement: "W"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    value_type: S_WORD
+ 
+  - platform: modbus_controller
+    modbus_controller_id: modbus_deye
+    #skip_updates: 5
     name: "${deye_name} Warning 1"
     id:  deye_warning_1
     register_type: holding
@@ -1522,7 +1618,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Warning 2"
     id:  deye_warning_2
     register_type: holding
@@ -1532,7 +1628,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Error 1"
     id:  deye_error_1
     register_type: holding
@@ -1542,7 +1638,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Error 2"
     id:  deye_error_2
     register_type: holding
@@ -1552,7 +1648,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Error 3"
     id:  deye_error_3
     register_type: holding
@@ -1562,7 +1658,7 @@ sensor:
   
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Error 4"
     id:  deye_error_4
     register_type: holding
@@ -1572,7 +1668,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    name: "${deye_name} Failure status of communication board"
+    name: "${deye_name} Failure Status Of Communication Board"
     id:  deye_Failure_status_of_communication_board
     register_type: holding
     address: 548
@@ -1582,7 +1678,7 @@ sensor:
   # Battery
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily Battery Charge"
     id: deye_Daily_Battery_Charge
     icon: mdi:battery-plus
@@ -1598,7 +1694,7 @@ sensor:
   
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 6
+    # skip_updates: 5
     name: "${deye_name} Daily Battery Discharge"
     id: deye_Daily_Battery_Discharge
     icon: mdi:battery-minus
@@ -1614,7 +1710,7 @@ sensor:
 
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 60
+    # skip_updates: 75
     name: "${deye_name} Battery Total Charge"
     id:  deye_battery_total_charge
     register_type: holding
@@ -1629,7 +1725,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    skip_updates: 60
+    # skip_updates: 75
     name: "${deye_name} Battery Total Discharge"
     id:  deye_battery_total_discharge
     register_type: holding
@@ -1670,7 +1766,7 @@ sensor:
  
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 5
     name: "${deye_name} Battery Capacity"
     id: deye_battery_capacity
     register_type: holding
@@ -1744,7 +1840,7 @@ text_sensor:
   # Modbus to DEYE Inverter
   - platform: modbus_controller
     modbus_controller_id: modbus_deye
-    #skip_updates: 2
+    # skip_updates: 5
     id: deye_Running_Status
     bitmask: 0
     register_type: holding
@@ -1767,7 +1863,7 @@ text_sensor:
 # Slider
 number:
   - platform: template
-    name: "Balance voltage"
+    name: "Balance Voltage"
     id: "balance_voltage"
     step: 0.1
     min_value: "${balance_v_slider_min}"
@@ -1779,7 +1875,7 @@ number:
     optimistic: true
     restore_value: true
   - platform: template
-    name: "Min discharge voltage"
+    name: "Min Discharge Voltage"
     id: "min_dischange_voltage"
     step: 0.1
     min_value: "${min_dischange_v_slider_min}"
@@ -1791,7 +1887,7 @@ number:
     optimistic: true
     restore_value: true
   - platform: template
-    name: "Charging current max"
+    name: "Charging Current Max"
     id: "charging_current"
     step: 1
     min_value: 0
@@ -1803,7 +1899,7 @@ number:
     optimistic: true
     restore_value: true
   - platform: template
-    name: "Discharging current max"
+    name: "Discharging Current Max"
     id: "discharging_current"
     step: 1
     min_value: 0
@@ -1839,7 +1935,7 @@ number:
     optimistic: true
     restore_value: true
   - platform: template
-    name: "Days between balancing"
+    name: "Days Between Balancing"
     id: "days_between_balancing"
     step: 1
     min_value: 0
@@ -1908,7 +2004,7 @@ number:
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
   #   id: deye_Maximum_battery_grid_charge_current
-  #   name: "${deye_name} Maximum Battery Grid charge current"
+  #   name: "${deye_name} Maximum Battery Grid Charge Current"
   #   unit_of_measurement: A
   #   address: 128
   #   min_value: 0
@@ -2223,12 +2319,12 @@ switch:
     id: ntc_vcc
   
   - platform: template
-    name: Charging enabled
+    name: Charging Enabled
     id: inverter_charging
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON # restore_state: true
   - platform: template
-    name: Discharge enabled
+    name: Discharge Enabled
     id: inverter_discharging
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON # restore_state: true
@@ -2269,7 +2365,7 @@ switch:
   # - platform: modbus_controller  # Advanced peak shaving and valley filling function enabled
   #   use_write_multiple: true
   #   modbus_controller_id: modbus_deye
-  #   name: "${deye_name} Time of Use" 
+  #   name: "${deye_name} Time Of Use" 
   #   id: deye_Time_of_Use
   #   register_type: holding
   #   address: 146
