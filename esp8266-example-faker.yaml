@@ -1,6 +1,0 @@
-<<: !include esp8266-example-debug.yaml
-
-jk_bms:
-  id: bms0
-  jk_modbus_id: modbus0
-  enable_fake_traffic: true
