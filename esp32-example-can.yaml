@@ -83,7 +83,7 @@ substitutions:
 
 # --------------------------------------
 #### Don't make changes below this ####
-  external_components_source: github://Ackmaniac/esphome-jk-bms-can@develop # TODO set to main
+  external_components_source: github://Ackmaniac/esphome-jk-bms-can@main # TODO set to main
 
 esphome:
   name: hjdc          
@@ -173,8 +173,8 @@ wifi:
 #  port: 80
 #  local: true
 #  auth:
-#    username: "jkbms" # !secret jk_bms_web_server_username
-#    password: "jkbms" # !secret jk_bms_web_server_password
+#    username: "HJDC" # !secret jk_bms_web_server_username
+#    password: "HJDC" # !secret jk_bms_web_server_password
 
 ota:
 
@@ -186,6 +186,7 @@ logger:
 # Please use the native `api` component instead of the `mqtt` section
 # if you use Home Assistant. The native API is more lightweight.
 api:
+  reboot_timeout: 1440min
 
 #mqtt:
 #  broker: !secret mqtt_host
@@ -261,8 +262,8 @@ interval:
                 id(uart_missing_error) = false;
                 id(no_uart_update_counter) = 0;
                 id(bms0).set_states_updated(false);
-                //id(canStepCounter) = 1;
-                return false;
+                id(canStepCounter) = 1;
+                return true;
               } else if (id(canStepCounter) != 0) {
                 if (id(can_305_rx) > 30) {
                   ESP_LOGI("main", "No rx can 0x305 reply, Inverter not connected/responding, Rebooting...");
@@ -273,7 +274,7 @@ interval:
                 }
 
                 id(canStepCounter)++;
-                return false;
+                return true;
 
               } else if (id(no_uart_update_counter)++ >= 500) { // 500 is 500x10ms = 5000ms = 5s
                 id(uart_missing_error) = true;
@@ -695,7 +696,7 @@ sensor:
     name: "${jk_name} Temperature Wire"
     calibration:
       b_constant: 3950
-      reference_temperature: 25°C
+      reference_temperature: 25Â°C
       reference_resistance: 10kOhm
     filters:
       - sliding_window_moving_average:

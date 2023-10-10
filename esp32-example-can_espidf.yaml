@@ -83,7 +83,7 @@ substitutions:
 
 # --------------------------------------
 #### Don't make changes below this ####
-  external_components_source: github://Ackmaniac/esphome-jk-bms-can@develop # TODO set to main
+  external_components_source: github://Ackmaniac/esphome-jk-bms-can@main # TODO set to main
 
 esphome:
   name: hjdc          
@@ -178,8 +178,8 @@ wifi:
 #  port: 80
 #  local: true
 #  auth:
-#    username: "jkbms" # !secret jk_bms_web_server_username
-#    password: "jkbms" # !secret jk_bms_web_server_password
+#    username: "HJDC" # !secret jk_bms_web_server_username
+#    password: "HJDC" # !secret jk_bms_web_server_password
 
 ota:
 
@@ -267,8 +267,8 @@ interval:
                 id(uart_missing_error) = false;
                 id(no_uart_update_counter) = 0;
                 id(bms0).set_states_updated(false);
-                //id(canStepCounter) = 1;
-                return false;
+                id(canStepCounter) = 1;
+                return true;
               } else if (id(canStepCounter) != 0) {
                 if (id(can_305_rx) > 30) {
                   ESP_LOGI("main", "No rx can 0x305 reply, Inverter not connected/responding, Rebooting...");
@@ -279,7 +279,7 @@ interval:
                 }
 
                 id(canStepCounter)++;
-                return false;
+                return true;
 
               } else if (id(no_uart_update_counter)++ >= 500) { // 500 is 500x10ms = 5000ms = 5s
                 id(uart_missing_error) = true;
