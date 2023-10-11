@@ -161,7 +161,7 @@ or just use the `esp32-example-can-deye-modbus_espidf.yaml` as proof of concept:
 pip3 install esphome
 
 # Clone this external component
-git clone https://github://Ackmaniac/esp32-example-can-deye-modbus_espidf.git
+git clone https://github://Ackmaniac/esphome-jk-bms-can.git
 cd esphome-jk-bms-can
 
 # Create a secrets.yaml containing some setup specific secrets
