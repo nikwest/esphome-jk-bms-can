@@ -419,6 +419,34 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
       limitedChargeVoltage = chargeVoltage;
     }
   }
+
+  void limitDischargeVoltage(float minCellVoltage, float underRecoveryVoltage, float actualBmsAmps, const char* limitText) {
+
+    if (dischargeVoltageCounter == 0) {
+      if (actualBmsAmps <= 0.0) {
+        if (minCellVoltage <= underRecoveryVoltage) {
+          limitedDischargeVoltage += 0.1;
+          dischargeVoltageCounter = 10; // set counter for 10 seconds
+        }
+
+        if (minCellVoltage >= underRecoveryVoltage + 0.010 && dischargeVoltage != limitedDischargeVoltage) {
+          limitedDischargeVoltage -= 0.1;
+          dischargeVoltageCounter = 10; // set counter for 10 seconds
+        }
+      }
+    } else {
+      dischargeVoltageCounter--;
+    }
+
+    if (dischargeVoltage < limitedDischargeVoltage) {
+      strcpy(limitedDischargeVoltageReason, "discharge limited by ");
+      strcat(limitedDischargeVoltageReason, limitText);
+      ESP_LOGI("main", "discharge limited by %s to %.1f", limitText, uint16_t(limitedDischargeVoltage * 10) / 10.0f);
+    } else {
+      strcpy(limitedDischargeVoltageReason," ");
+      limitedDischargeVoltage = dischargeVoltage;
+    }
+  }
   
   void setRampups(float step) {
     // Charge Current
@@ -578,6 +606,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   float limitedDischargeVoltage = -1;
 
   uint8_t chargeVoltageCounter = 0;
+  uint8_t dischargeVoltageCounter = 0;
 
   char limitedChargeCurrentReason[200];
   char limitedDischargeCurrentReason[200];
