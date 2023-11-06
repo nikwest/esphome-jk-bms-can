@@ -253,7 +253,8 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   // protection calculation
 
-  void initValues(float initChargeCurrent, float initDischargeCurrent, float initMinCharge, float initMinDischarge ) {
+  void initCurrentValues(float initChargeCurrent, float initDischargeCurrent, float initMinCharge, float initMinDischarge) {
+    //current
     chargeCurrent = initChargeCurrent;
     dischargeCurrent = initDischargeCurrent;
     
@@ -273,6 +274,24 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
     minCharge = initMinCharge;
     minDischarge = initMinDischarge;
+  }
+
+  void initVoltageValues(float initChargeVoltage, float initDischargeVoltage) {
+    //voltage
+    chargeVoltage = initChargeVoltage;
+    dischargeVoltage = initDischargeVoltage;
+
+    strcpy(limitedChargeVoltageReason," ");
+    strcpy(limitedDischargeVoltageReason," ");
+
+    if (limitedChargeVoltage == -1) {
+      limitedChargeVoltage = chargeVoltage;
+    } 
+    
+    if (limitedDischargeVoltage == -1) {
+      limitedDischargeVoltage = dischargeVoltage;
+    }
+
   }
   
   void limitAbsolutChargeCurrent(float maximum) {
@@ -316,7 +335,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
         strcpy(limitedChargeCurrentReason, "charge limited by ");
         strcat(limitedChargeCurrentReason, limitText);
         ESP_LOGI("main", "charge limited by %s to %.1f", limitText, uint16_t(limitedChargeCurrent * 10) / 10.0f);
-        chargeIsLimited = true;
+        chargeCurrentIsLimited = true;
       }
     }
   }
@@ -354,7 +373,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
         strcpy(limitedDischargeCurrentReason, "discharge limited by ");
         strcat(limitedDischargeCurrentReason, limitText);
         ESP_LOGI("main", "discharge limited by %s to %.1f", limitText, uint16_t(limitedDischargeCurrent * 10) / 10.0f);
-        dischargeIsLimited = true;
+        dischargeCurrentIsLimited = true;
       } 
     }
   }
@@ -372,13 +391,41 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
     limitChargeCurrent(val, minimum, maximum, bufferFromMax, limitText, false);
     limitDischargeCurrent(val, minimum, maximum, bufferFromMax, limitText, false);
   }
+
+  void limitChargeVoltage(float maxCellVoltage, float cellStartBalanceVoltage, float overRecoveryVoltage, float actualBmsAmps, const char* limitText) {
+
+    if (chargeVoltageCounter == 0) {
+      if (actualBmsAmps >= 0.0) {
+        if (maxCellVoltage >= overRecoveryVoltage) {
+          limitedChargeVoltage -= 0.1;
+          chargeVoltageCounter = 10; // set counter for 10 seconds
+        }
+
+        if (maxCellVoltage <= cellStartBalanceVoltage && chargeVoltage != limitedChargeVoltage) {
+          limitedChargeVoltage += 0.1;
+          chargeVoltageCounter = 10; // set counter for 10 seconds
+        }
+      }
+    } else {
+      chargeVoltageCounter--;
+    }
+
+    if (chargeVoltage > limitedChargeVoltage) {
+      strcpy(limitedChargeVoltageReason, "charge limited by ");
+      strcat(limitedChargeVoltageReason, limitText);
+      ESP_LOGI("main", "charge limited by %s to %.1f", limitText, uint16_t(limitedChargeVoltage * 10) / 10.0f);
+    } else {
+      strcpy(limitedChargeVoltageReason," ");
+      limitedChargeVoltage = chargeVoltage;
+    }
+  }
   
   void setRampups(float step) {
-    // CHARGING
-    if (chargeIsLimited) {
+    // Charge Current
+    if (chargeCurrentIsLimited) {
       rampUpLimitedChargeCurrent = fmax(minCharge, rampUpLimitedChargeCurrent);
       if (limitedChargeCurrent > rampUpLimitedChargeCurrent) {
-        strcpy(limitedChargeCurrentReason, "charge limited for ramp up by ");
+        strcpy(limitedChargeCurrentReason, "charge limited by ramp up by ");
         char str_f[20];
         sprintf(str_f, "%.1f", limitedChargeCurrent - rampUpLimitedChargeCurrent);
         strcat(limitedChargeCurrentReason, str_f);
@@ -388,7 +435,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
       }
       
       if (limitedChargeCurrent == chargeCurrent) {
-        chargeIsLimited = false;
+        chargeCurrentIsLimited = false;
       }
 
       rampUpLimitedChargeCurrent += step;
@@ -396,11 +443,11 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
       rampUpLimitedChargeCurrent = limitedChargeCurrent;
     }
 
-    // DISCHARGING
-    if (dischargeIsLimited) {
+    // Discharge Current
+    if (dischargeCurrentIsLimited) {
       rampUpLimitedDischargeCurrent = fmax(minDischarge, rampUpLimitedDischargeCurrent);
       if (limitedDischargeCurrent > rampUpLimitedDischargeCurrent) {
-        strcpy(limitedDischargeCurrentReason, "discharge limited for ramp up by ");
+        strcpy(limitedDischargeCurrentReason, "discharge limited by ramp up by ");
         char str_f[20];
         sprintf(str_f, "%.1f", limitedDischargeCurrent - rampUpLimitedDischargeCurrent);
         strcat(limitedDischargeCurrentReason, str_f);
@@ -410,7 +457,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
       }
         
       if (limitedDischargeCurrent == dischargeCurrent) {
-        dischargeIsLimited = false;
+        dischargeCurrentIsLimited = false;
       }
 
       rampUpLimitedDischargeCurrent += step;
@@ -426,6 +473,10 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
   char* getLimitedChargeCurrentReason() {return limitedChargeCurrentReason;}
 
   char* getLimitedDischargeCurrentReason() {return limitedDischargeCurrentReason;}
+
+  char* getLimitedChargeVoltageReason() {return limitedChargeVoltageReason;}
+
+  char* getLimitedDischargeVoltageReason() {return limitedDischargeVoltageReason;}
 
  protected:
   sensor::Sensor *min_cell_voltage_sensor_;
@@ -518,18 +569,26 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   float chargeCurrent = 0;
   float dischargeCurrent = 0;
+  float chargeVoltage = 0;
+  float dischargeVoltage = 0;
 
   float limitedChargeCurrent = 0;
   float limitedDischargeCurrent = 0;
+  float limitedChargeVoltage = -1;
+  float limitedDischargeVoltage = -1;
+
+  uint8_t chargeVoltageCounter = 0;
 
   char limitedChargeCurrentReason[200];
   char limitedDischargeCurrentReason[200];
+  char limitedChargeVoltageReason[200];
+  char limitedDischargeVoltageReason[200];
     
   float rampUpLimitedChargeCurrent = -1;
   float rampUpLimitedDischargeCurrent = -1;
-
-  bool chargeIsLimited = false;
-  bool dischargeIsLimited = false;
+  
+  bool chargeCurrentIsLimited = false;
+  bool dischargeCurrentIsLimited = false;
 
   float minCharge;
   float minDischarge;
