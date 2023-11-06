@@ -498,6 +498,10 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
 
   float getLimitedDischargeCurrent() {return limitedDischargeCurrent;}
 
+  float getLimitedChargeVoltage() {return limitedChargeVoltage;}
+
+  float getLimitedDischargeVoltage() {return limitedDischargeVoltage;}
+
   char* getLimitedChargeCurrentReason() {return limitedChargeCurrentReason;}
 
   char* getLimitedDischargeCurrentReason() {return limitedDischargeCurrentReason;}
