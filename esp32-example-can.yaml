@@ -386,24 +386,40 @@ interval:
                       }
 
                       // # startCalculuation
-                      id(bms0).initValues(min(id(charging_overcurrent_protection).state * 0.975f, id(charging_current).state),
-                                          min(id(discharging_overcurrent_protection).state * 0.975f, id(discharging_current).state),
-                                          ${min_charge_a},
-                                          ${min_discharge_a});
+                      id(bms0).initCurrentValues(min(id(charging_overcurrent_protection).state * 0.975f, id(charging_current).state),
+                                                 min(id(discharging_overcurrent_protection).state * 0.975f, id(discharging_current).state),
+                                                 ${min_charge_a},
+                                                 ${min_discharge_a});
 
-                      // # cell_voltage_overvoltage
+                      id(bms0).initVoltageValues(id(balance_voltage).state,
+                                                 id(min_dischange_voltage).state);
+
+                      // # cell_voltage_overvoltage for current
                       id(bms0).limitChargeCurrent(id(max_cell_voltage).state,
                                                   id(cell_voltage_overvoltage_recovery).state,
                                                   id(cell_voltage_overvoltage_protection).state,
                                                   0.1f,
                                                   "cell_voltage_overvoltage");
 
-                      // # cell_voltage_undervoltage
+                      // # cell_voltage_overvoltage for voltage
+                      id(bms0).limitChargeVoltage(id(max_cell_voltage).state,
+                                                  id(balance_starting_voltage).state,
+                                                  id(cell_voltage_overvoltage_recovery).state,
+                                                  id(current).state,
+                                                  "cell_voltage_overvoltage");
+
+                      // # cell_voltage_undervoltage for current
                       id(bms0).limitChargeCurrent(id(min_cell_voltage).state,
                                                   id(cell_voltage_undervoltage_recovery).state,
                                                   id(cell_voltage_undervoltage_protection).state,
                                                   0.1f,
                                                   "cell_voltage_undervoltage");
+
+                      // # cell_voltage_undervoltage for voltage
+                      id(bms0).limitDischargeVoltage(id(min_cell_voltage).state,
+                                                     id(cell_voltage_undervoltage_recovery).state,
+                                                     id(current).state,
+                                                     "cell_voltage_undervoltage");
 
                       // # power_tube_temperature
                       id(bms0).limitChargeAndDischargeCurrent(id(power_tube_temperature).state,
@@ -511,9 +527,11 @@ interval:
                         }
 
                         if (id(chargingAllowed)) {
+                          charge_volt = id(bms0).getLimitedChargeVoltage();
                           charge_amp = id(bms0).getLimitedChargeCurrent();
                         }
                         if (id(dischargingAllowed)) {
+                          discharge_volt = id(bms0).getLimitedDischargeVoltage();
                           discharge_amp = id(bms0).getLimitedDischargeCurrent();
                         }
                       }
@@ -534,6 +552,9 @@ interval:
 
                       if (id(limited_charge_current_reason).state != id(bms0).getLimitedChargeCurrentReason()) id(limited_charge_current_reason).publish_state(id(bms0).getLimitedChargeCurrentReason());
                       if (id(limited_discharge_current_reason).state != id(bms0).getLimitedDischargeCurrentReason()) id(limited_discharge_current_reason).publish_state(id(bms0).getLimitedDischargeCurrentReason());
+
+                      if (id(limited_charge_voltage_reason).state != id(bms0).getLimitedChargeVoltageReason()) id(limited_charge_voltage_reason).publish_state(id(bms0).getLimitedChargeVoltageReason());
+                      if (id(limited_discharge_voltage_reason).state != id(bms0).getLimitedDischargeVoltageReason()) id(limited_discharge_voltage_reason).publish_state(id(bms0).getLimitedDischargeVoltageReason());
 
                       if (id(charging_status).state != id(charge_status)) {
                         id(charging_status).publish_state(id(charge_status));
@@ -1010,6 +1031,12 @@ text_sensor:
   - platform: template
     name: "Limited Discharge Current Reason"
     id: limited_discharge_current_reason
+  - platform: template
+    name: "Limited Charge Voltage Reason"
+    id: limited_charge_voltage_reason
+  - platform: template
+    name: "Limited Discharge Voltage Reason"
+    id: limited_discharge_voltage_reason
 
 
 # Slider
