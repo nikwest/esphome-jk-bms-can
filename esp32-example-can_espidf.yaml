@@ -136,7 +136,11 @@ globals:
     initial_value: '0'
   - id: next_top_balance_value
     type: int
-    restore_value: yes
+    restore_value: no
+    initial_value: '0'
+  - id: last_balance_value
+    type: int
+    restore_value: no
     initial_value: '0'
   - id: uart_missing_error
     type: bool
@@ -970,6 +974,27 @@ sensor:
                 (minutes ? to_string(minutes) + "m " : "") +
                 (to_string(seconds) + "s")
               ).c_str();
+        - text_sensor.template.publish:
+            id: last_balance_human
+            state: !lambda |-
+              if (id(last_balance_value) != 0) {
+                int seconds = round(id(uptime_sensor).raw_state) - id(last_balance_value);
+                int days = seconds / (24 * 3600);
+                seconds = seconds % (24 * 3600);
+                int hours = seconds / 3600;
+                seconds = seconds % 3600;
+                int minutes = seconds /  60;
+                seconds = seconds % 60;
+                return (
+                  (days ? to_string(days) + "d " : "") +
+                  (hours ? to_string(hours) + "h " : "") +
+                  (minutes ? to_string(minutes) + "m " : "") +
+                  (to_string(seconds) + "s")
+                ).c_str();
+              } else {
+                return "unknown";
+              }
+        
 
         
 
@@ -1022,6 +1047,10 @@ text_sensor:
   - platform: template
     name: Uptime Human Readable
     id: uptime_human
+    icon: mdi:clock-start
+  - platform: template
+    name: Last Balance Human Readable
+    id: last_balance_human
     icon: mdi:clock-start
   - platform: template
     name: Next Top Balance
@@ -1163,9 +1192,10 @@ script:
           id(next_top_balance_value) = 0;
       - delay: ${absorption_time}s
       - lambda: |-
-          if(id(days_between_balancing).state > 0) {
+          if (id(days_between_balancing).state > 0) {
             id(inverter_top_balance).publish_state(false);
-            id(trigger_timer_for_next_balancing_script).execute();  
+            id(trigger_timer_for_next_balancing_script).execute();
+            id(last_balance_value) = round(id(uptime_sensor).raw_state);
           }
           
   - id: trigger_timer_for_next_balancing_script
