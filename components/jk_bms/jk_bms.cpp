@@ -97,13 +97,12 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
     
   uint8_t cells = data[1] / 3;
   
-  this->publish_state_(this->cells_sensor_, cells);
-
   float min_cell_voltage = 100.0f;
   float max_cell_voltage = -100.0f;
   float average_cell_voltage = 0.0f;
   uint8_t min_voltage_cell = 0;
   uint8_t max_voltage_cell = 0;
+
   for (uint8_t i = 0; i < cells; i++) {
     float cell_voltage = (float) jk_get_16bit(i * 3 + 3) * 0.001f;
     average_cell_voltage = average_cell_voltage + cell_voltage;
@@ -115,8 +114,17 @@ void JkBms::on_status_data_(const std::vector<uint8_t> &data) {
       max_cell_voltage = cell_voltage;
       max_voltage_cell = i + 1;
     }
+
+    // check for valid cell voltages, it can happen that the data contains wrong data, in this case abort the data processing
+    if (cell_voltage > 5.0f) {
+        ESP_LOGW(TAG, "Invalid cell voltage, ignore data!");
+        return;
+    }
     this->publish_state_(this->cells_[i].cell_voltage_sensor_, cell_voltage);
   }
+  
+  this->publish_state_(this->cells_sensor_, cells);
+
   average_cell_voltage = average_cell_voltage / cells;
 
   this->publish_state_(this->min_cell_voltage_sensor_, min_cell_voltage);

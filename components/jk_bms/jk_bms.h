@@ -401,7 +401,7 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
           chargeVoltageCounter = 10; // set counter for 10 seconds
         }
 
-        if (maxCellVoltage <= cellStartBalanceVoltage && chargeVoltage != limitedChargeVoltage) {
+        if ((maxCellVoltage <= cellStartBalanceVoltage || maxCellVoltage < overRecoveryVoltage - 0.005) && chargeVoltage != limitedChargeVoltage) {
           limitedChargeVoltage += 0.1;
           chargeVoltageCounter = 10; // set counter for 10 seconds
         }
