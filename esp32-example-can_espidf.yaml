@@ -371,7 +371,7 @@ interval:
                         }
 
                       } else {
-                        id(charge_status) = id(charge_to) + std::to_string(uint16_t(id(max_charge_percent).state)) + "%";
+                        id(charge_status) = id(charge_to) + std::to_string(uint16_t(id(max_charge).state)) + "%";
                       }
 
                       if (   id(balancing_script).is_running()
@@ -509,12 +509,12 @@ interval:
                                 || id(charge_status) == "Top Balancing") 				     // Overides to disable charging
                           )
                         {
-                          if (id(capacity_remaining).state < id(max_charge_percent).state || id(charge_status) == "Top Balancing") {
+                          if (id(capacity_remaining).state < id(max_charge).state || id(charge_status) == "Top Balancing") {
                             id(chargingAllowed) = true;
-                          } else if (id(capacity_remaining).state > id(max_charge_percent).state) {
+                          } else if (id(capacity_remaining).state > id(max_charge).state) {
                             id(chargingAllowed) = false;
                           } else {
-                            // id(capacity_remaining).state = id(max_charge_percent).state
+                            // id(capacity_remaining).state = id(max_charge).state
                             // leave the value of id(chargingAllowed) as it is
                           }
                         } else {
@@ -523,12 +523,12 @@ interval:
                         
                         if (id(discharging_switch).state && id(inverter_discharging).state) {
 
-                          if (id(capacity_remaining).state < id(min_discharge_percent).state) {
+                          if (id(capacity_remaining).state < id(min_discharge).state) {
                             id(dischargingAllowed) = false;
-                          } else if (id(capacity_remaining).state > id(min_discharge_percent).state) {
+                          } else if (id(capacity_remaining).state > id(min_discharge).state) {
                             id(dischargingAllowed) = true;
                           } else {
-                            // id(capacity_remaining).state = id(min_discharge_percent).state
+                            // id(capacity_remaining).state = id(min_discharge).state
                             // leave the value of id(dischargingAllowed) as it is
                           }
                         } else {
@@ -1125,7 +1125,7 @@ number:
     restore_value: true
   - platform: template
     name: "Max Charge %"
-    id: "max_charge_percent"
+    id: "max_charge"
     step: 1
     min_value: 10
     max_value: 100
@@ -1137,7 +1137,7 @@ number:
     restore_value: true
   - platform: template
     name: "Min Discharge %"
-    id: "min_discharge_percent"
+    id: "min_discharge"
     step: 1
     min_value: 1
     max_value: 90
