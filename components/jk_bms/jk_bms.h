@@ -398,10 +398,10 @@ class JkBms : public PollingComponent, public jk_modbus::JkModbusDevice {
       if (actualBmsAmps >= 0.0) {
         if (maxCellVoltage >= overRecoveryVoltage) {
           limitedChargeVoltage -= 0.1;
-          chargeVoltageCounter = 10; // set counter for 10 seconds
+          chargeVoltageCounter = 30; // set counter for 30 seconds
         }
 
-        if ((maxCellVoltage <= cellStartBalanceVoltage || maxCellVoltage < overRecoveryVoltage - 0.005) && chargeVoltage != limitedChargeVoltage) {
+        if ((maxCellVoltage <= cellStartBalanceVoltage || maxCellVoltage < overRecoveryVoltage - 0.010) && chargeVoltage != limitedChargeVoltage) {
           limitedChargeVoltage += 0.1;
           chargeVoltageCounter = 10; // set counter for 10 seconds
         }
