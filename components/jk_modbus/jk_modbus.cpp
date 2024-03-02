@@ -47,7 +47,7 @@ bool JkModbus::parse_jk_modbus_byte_(uint8_t byte) {
     return true;
 
   if (raw[0] != 0x4E || raw[1] != 0x57) {
-    ESP_LOGW(TAG, "Invalid header");
+    ESP_LOGW(TAG, "Invalid header %x:%x", raw[0], raw[1]);
 
     // return false to reset buffer
     return false;
